@@ -45,7 +45,7 @@ The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
 | Quality | `ruff`, `pytest`, GitHub Actions |
 | Extra (optional) | JS/TS for a web leaderboard dashboard later on |
 
-Candidate data sources (see [ARCHITECTURE.md](ARCHITECTURE.md#data-sources)): **football-data.org**, **API-Football (api-sports)**, **TheSportsDB** and **flagcdn** for flags.
+Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags and, optionally, **API-Football**.
 
 ---
 
@@ -56,6 +56,7 @@ Candidate data sources (see [ARCHITECTURE.md](ARCHITECTURE.md#data-sources)): **
 | [README.md](README.md) | This overview |
 | [ROADMAP.md](ROADMAP.md) | Phases, tasks and work areas to split between us |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the bot is built internally: folders, data, images |
+| [APIS.md](APIS.md) | Free APIs we use, their limits and sign-up links |
 | [COMMANDS.md](COMMANDS.md) | Catalog of every command and trivia mode |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Team rules: branches, commits, PRs, code style |
 

@@ -98,19 +98,19 @@ FootballBot/
 
 ## Data sources
 
-> Free-tier limits change; **verify them when creating the accounts** and record the real numbers here.
+All sources are free. Details, limits and sign-up links are in [APIS.md](APIS.md).
 
-| Source | Used for | Free tier (approx.) | Notes |
-|---|---|---|---|
-| [football-data.org](https://www.football-data.org/) | Matches, standings, scorers, teams for the major leagues | ~10 requests/min, ~12 competitions | Includes each team's crest URL. Good for daily data |
-| [API-Football (api-sports.io)](https://www.api-football.com/) | Everything: many leagues, players with photos, stats, transfers, live | ~100 requests/**day** | Player photos and logos on their CDN. Use sparingly |
-| [TheSportsDB](https://www.thesportsdb.com/) | Crests, **stadium photos**, kits, banners, colors, year founded | Free test key | Ideal for the trivia dataset |
-| [flagcdn.com](https://flagcdn.com/) | Flags by ISO code (`/w320/co.png`) | Free | For `flag`, `club-country`, nationalities |
+| Source | Used for |
+|---|---|
+| football-data.org | Matches, standings, scorers, teams and crests for 12 competitions |
+| TheSportsDB | Crests, kits, stadiums, colors, year founded (trivia dataset) |
+| flagcdn | Flags |
+| API-Football (optional) | Players and career paths for trivia (free plan likely past seasons only) |
 
 **Strategy:**
-- **Live info** (`/live`, `/matches`, `/standings`) -> football-data.org, short cache (30 s to 5 min).
+- **Live info** (`/live`, `/matches`, `/standings`) -> football-data.org, short cache (30 s to 5 min). Free scores are delayed, so `/live` is not real time.
 - **Trivia** -> never calls an API during a game. Uses the **local dataset** built weekly by `scripts/build_dataset.py`.
-- **Players and career paths** -> API-Football, cached for days (they rarely change).
+- **Players and career paths** -> API-Football, built offline into the dataset (the free plan may only cover past seasons).
 
 ### Trivia dataset
 
