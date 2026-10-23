@@ -45,7 +45,7 @@ The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
 | Quality | `ruff`, `pytest`, GitHub Actions |
 | Extra (optional) | JS/TS for a web leaderboard dashboard later on |
 
-Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags (secondary) and, optionally, **API-Football**.
+Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags (secondary) and **Wikidata** as a backup for player careers.
 
 ---
 
@@ -78,8 +78,7 @@ Planned environment variables:
 DISCORD_TOKEN=
 DISCORD_DEV_GUILD_ID=        # test server: slash commands sync instantly there
 FOOTBALL_DATA_KEY=
-API_FOOTBALL_KEY=
-THESPORTSDB_KEY=
+THESPORTSDB_KEY=123            # public free key
 DATABASE_URL=sqlite:///data/footballbot.db
 ```
 

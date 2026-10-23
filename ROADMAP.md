@@ -73,7 +73,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 
 - [ ] Effects `silhouette`, `zoom_crop`, `grayscale`
 - [ ] Modes `silhouette`, `zoom`, `club-country`, `flag`, `stadium`
-- [ ] Player dataset (API-Football): photo, nationality, position, clubs with years
+- [ ] Player dataset (football-data squads + TheSportsDB): photo, nationality, position, clubs with years
 - [ ] `player` mode (blurred black and white photo)
 - [ ] `career` mode with a composite crest image
 - [ ] `who-am-i` mode with progressive clues
@@ -89,7 +89,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 - [ ] **Versus** card for `/next` and `/last`
 - [ ] `/scorers`, `/assists`, `/player`, `/squad`
 - [ ] `/follow` + `poll_live` task with goal alerts
-- [ ] API-Football provider for player data (and Liga BetPlay / Libertadores if the free plan allows the current season)
+- [ ] Wikidata provider as backup for missing career paths
 - [ ] `/config` (trivia channel, default leagues, answer mode)
 
 ---

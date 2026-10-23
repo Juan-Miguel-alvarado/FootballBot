@@ -16,7 +16,7 @@ flowchart LR
     end
 
     P --> FD[football-data.org]
-    P --> AF[API-Football]
+    P --> WD[Wikidata]
     P --> TS[TheSportsDB]
     P --> FL[flagcdn]
     R --> DB[(SQLite / Postgres)]
@@ -70,8 +70,8 @@ FootballBot/
 │   ├── providers/
 │   │   ├── base.py            # FootballProvider protocol
 │   │   ├── football_data.py
-│   │   ├── api_football.py
 │   │   ├── thesportsdb.py
+│   │   ├── wikidata.py
 │   │   └── flags.py
 │   ├── imaging/
 │   │   ├── effects.py         # pixelate, blur, silhouette, zoom_crop, grayscale
@@ -103,14 +103,14 @@ All sources are free. Details, limits and sign-up links are in [APIS.md](APIS.md
 | Source | Used for |
 |---|---|
 | football-data.org | Matches, standings, scorers, teams and crests for 12 competitions |
-| TheSportsDB | Crests, kits, stadiums, colors, year founded (trivia dataset) |
+| TheSportsDB | Crests, kits, stadiums, colors, year founded, players and career paths (trivia dataset) |
 | flagcdn | Flags |
-| API-Football (optional) | Players and career paths for trivia (free plan likely past seasons only) |
+| Wikidata | Backup for player career paths |
 
 **Strategy:**
 - **Live info** (`/live`, `/matches`, `/standings`) -> football-data.org, short cache (30 s to 5 min). Free scores are delayed, so `/live` is not real time.
 - **Trivia** -> never calls an API during a game. Uses the **local dataset** built weekly by `scripts/build_dataset.py`.
-- **Players and career paths** -> API-Football, built offline into the dataset (the free plan may only cover past seasons).
+- **Players and career paths** -> squads from football-data.org, details and former clubs from TheSportsDB (Wikidata as backup), built offline into the dataset.
 
 ### Trivia dataset
 

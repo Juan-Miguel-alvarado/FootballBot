@@ -11,7 +11,7 @@
    ```
    feat(trivia): silhouette mode
    fix(providers): retry when football-data returns 429
-   docs: real API-Football limits
+   docs: real football-data.org limits
    ```
 4. Open a **Pull Request** into the branch you started from. At least **one person** reviews it before merging.
 5. Nobody pushes directly to `main`.
