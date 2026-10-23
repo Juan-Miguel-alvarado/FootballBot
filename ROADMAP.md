@@ -24,7 +24,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 - [ ] Create the GitHub repo and invite everyone
 - [ ] Create the bot application in the [Discord Developer Portal](https://discord.com/developers/applications) and share the token through a private channel (never through the repo)
 - [ ] Create a Discord test server with `#dev-bot`, `#trivia-test`, `#errors` channels
-- [ ] Get keys for football-data.org, API-Football and TheSportsDB; record the real limits in ARCHITECTURE.md
+- [ ] Create accounts and get keys for the APIs in [APIS.md](APIS.md); record the real limits there
 - [ ] Project skeleton: `pyproject.toml`, `.env.example`, `.gitignore`, folder structure
 - [ ] `ruff` + `pytest` + a GitHub Action that runs both on every PR
 - [ ] Decide the bot's name/avatar
@@ -89,7 +89,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 - [ ] **Versus** card for `/next` and `/last`
 - [ ] `/scorers`, `/assists`, `/player`, `/squad`
 - [ ] `/follow` + `poll_live` task with goal alerts
-- [ ] API-Football provider for leagues football-data does not cover (Colombian Liga BetPlay, Copa Libertadores, etc.)
+- [ ] API-Football provider for player data (and Liga BetPlay / Libertadores if the free plan allows the current season)
 - [ ] `/config` (trivia channel, default leagues, answer mode)
 
 ---
