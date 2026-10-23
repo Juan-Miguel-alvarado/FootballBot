@@ -5,9 +5,13 @@ Every data source has to be **free**. This is what we use, what each free tier g
 | API | Role | Key needed | Sign up |
 |---|---|---|---|
 | [football-data.org](https://www.football-data.org/) | **Main source**: matches, standings, scorers, teams | Yes (free) | https://www.football-data.org/client/register |
-| [TheSportsDB](https://www.thesportsdb.com/) | **Images for trivia**: crests, kits, stadiums, banners, colors | No (public key `123`) | Not needed for the free key |
+| [TheSportsDB](https://www.thesportsdb.com/) | **Trivia data**: crests, kits, stadiums, colors, players, career paths | No (public key `123`) | Not needed for the free key |
 | [flagcdn](https://flagcdn.com/) | Country flags (secondary) | No | Not needed |
-| [API-Football](https://www.api-football.com/) | **Optional**: players, career paths, leagues not covered above | Yes (free) | https://dashboard.api-football.com/register |
+| [Wikidata](https://www.wikidata.org/) | **Backup** for player career paths | No | Not needed |
+
+football-data.org is the only account we need.
+
+API-Football was considered for player data and dropped: the free sign-up kept failing and its free plan reportedly does not include the current season. TheSportsDB covers the same player data for free.
 
 ---
 
@@ -51,16 +55,22 @@ Docs: https://www.thesportsdb.com/documentation
 **Free tier:**
 - Public key `123`, 30 requests per minute.
 - Team data: `strBadge` (crest), `strLogo`, `strEquipment` (kit), `strBanner`, `strFanart1-4`, `strColour1-3`, `intFormedYear`, `strStadium`, `idVenue`.
+- Player data (`searchplayers.php`, `lookupplayer.php`): `strThumb` (photo), `strCutout` (transparent cutout), `strNationality`, `strPosition`, `dateBorn`, `strTeam`, plus external IDs such as `idWikidata`.
+- Career path (`lookupformerteams.php?id=<player_id>`): every former club with `strJoined`, `strDeparted` and its `strBadge`.
 - Images can be requested smaller by appending `/medium`, `/small` or `/tiny` to the URL.
 
 **Limits found (tested 2026-10-23):**
-- `searchteams.php?t=<name>` returns **1 result**.
+- `searchteams.php?t=<name>` and `searchplayers.php?p=<name>` return **1 result**.
 - `search_all_teams.php?l=<league>` returns **only 10 teams** (e.g. 10 of 20 Premier League clubs).
+- `lookup_all_players.php?id=<team_id>` returns **only 10 players** per team.
 - Livescores and the v2 API are premium only.
 
-**How we use it:** the team list comes from football-data.org; then `scripts/build_dataset.py` looks up each team on TheSportsDB by name to get its images. Runs once a week, so the limits do not matter.
+**How we use it:** team and squad lists come from football-data.org; then `scripts/build_dataset.py` looks up each team and player on TheSportsDB by name to get images, details and career path. Runs once a week, so the limits do not matter.
 
-Example: `https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=Arsenal`
+Examples:
+- `https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=Arsenal`
+- `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=Luis%20Diaz`
+- `https://www.thesportsdb.com/api/v1/json/123/lookupformerteams.php?id=34171827` (Barranquilla FC 2016-17, Atletico Junior 2017-19, Porto 2019-22, Liverpool 2022-25)
 
 ---
 
@@ -77,22 +87,16 @@ Note: England, Scotland and Wales use subdivision codes (`gb-eng`, `gb-sct`, `gb
 
 ---
 
-## API-Football (optional)
+## Wikidata (backup)
 
-Docs: https://www.api-football.com/documentation-v3
+Docs: https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service
 
-**Free tier:**
-- 100 requests per **day** (resets at 00:00 UTC), 10 per minute.
-- All endpoints and all leagues, including Colombian Liga BetPlay and Copa Libertadores.
-- Player photos, transfers, career history.
+- Free, no key. Query with SPARQL at `https://query.wikidata.org/sparql`.
+- Use it only when TheSportsDB is missing a player's career path: property `P54` (member of sports team) with start/end qualifiers.
+- TheSportsDB gives the player's Wikidata ID (`idWikidata`), so no name matching is needed.
+- Send a descriptive `User-Agent` header, as Wikimedia requires.
 
-**Catch (to verify when creating the account):** several reports say the free plan **does not include the current season**, only past ones. If confirmed, we only use it for:
-- the trivia dataset (career paths, `who-am-i`, `player` mode), built offline;
-- historical data.
-
-It is not used for live or current-season commands.
-
-**Auth:** header `x-apisports-key: <API_FOOTBALL_KEY>`.
+Not tested yet.
 
 ---
 
@@ -105,8 +109,9 @@ It is not used for live or current-season commands.
 | Crest / silhouette / zoom / blur trivia | football-data.org crests + TheSportsDB | Yes |
 | Stadium / kit trivia | TheSportsDB | Yes |
 | Flag trivia | flagcdn | Yes |
-| Player / career / who-am-i trivia | API-Football (past seasons) | Yes, with older data |
-| Liga BetPlay, Libertadores info | API-Football | Only past seasons — out of scope for now |
+| Player / career / who-am-i trivia, `/daily` | TheSportsDB (+ Wikidata backup) | Yes |
+| `/player`, `/squad` | football-data.org squads + TheSportsDB details | Yes (confirm squads once the key works) |
+| Liga BetPlay, Libertadores | No free source with current data | Out of scope for now |
 
 ---
 
