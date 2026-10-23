@@ -48,13 +48,15 @@ Every team/player/league argument uses **autocomplete** (Discord suggests while 
 
 ### Modes
 
+The core of the trivia is **club crests and league logos** (`crest`, `blur`, `silhouette`, `zoom`, `league`). Country flags are secondary: national team trivia, the `club-country` mode and player nationalities.
+
 | Mode | What you see | What you guess | Image trick | Priority |
 |---|---|---|---|---|
 | `crest` | Pixelated crest that gets clearer | The club | Progressive pixelation (downscale and upscale) | MVP |
 | `blur` | Blurred crest | The club | Decreasing Gaussian blur | MVP |
 | `silhouette` | Crest filled solid black | The club | Alpha channel to solid black | v2 |
 | `zoom` | A small crop of the crest that zooms out | The club | Random crop that grows each stage | v2 |
-| `flag` | A country's flag | The national team | flagcdn flag, can be pixelated | MVP |
+| `flag` | A country's flag | The national team | flagcdn flag, can be pixelated | v2 |
 | `club-country` | A club crest | The club's country (options shown as flags) | Buttons with flag emoji | v2 |
 | `club-clues` | Country flag + club colors + year founded + stadium | The club | Generated clue card | v2 |
 | `stadium` | Stadium photo | The stadium or the club | TheSportsDB photo, cropped | v2 |

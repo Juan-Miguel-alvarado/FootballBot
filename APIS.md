@@ -6,8 +6,23 @@ Every data source has to be **free**. This is what we use, what each free tier g
 |---|---|---|---|
 | [football-data.org](https://www.football-data.org/) | **Main source**: matches, standings, scorers, teams | Yes (free) | https://www.football-data.org/client/register |
 | [TheSportsDB](https://www.thesportsdb.com/) | **Images for trivia**: crests, kits, stadiums, banners, colors | No (public key `123`) | Not needed for the free key |
-| [flagcdn](https://flagcdn.com/) | Flags | No | Not needed |
+| [flagcdn](https://flagcdn.com/) | Country flags (secondary) | No | Not needed |
 | [API-Football](https://www.api-football.com/) | **Optional**: players, career paths, leagues not covered above | Yes (free) | https://dashboard.api-football.com/register |
+
+---
+
+## Crests and logos
+
+Crests are the core of the trivia. Both sources serve them **publicly, without a key** (checked 2026-10-23):
+
+| Source | URL | Format | Best for |
+|---|---|---|---|
+| football-data.org | `https://crests.football-data.org/<team_id>.png` / `.svg` | PNG and **SVG** | `crest`, `blur`, `zoom`: SVG stays sharp at any size before pixelating |
+| football-data.org | `https://crests.football-data.org/<competition_code>.png` (e.g. `PL`) | PNG | `league` mode |
+| TheSportsDB | `strBadge` field, add `/small` or `/medium` for smaller sizes | Transparent PNG | `silhouette`: clean alpha channel |
+| TheSportsDB | `strLogo`, `strEquipment` | PNG | Alternate logos, `kit` mode |
+
+The crest URL is stored in the trivia dataset; images are downloaded once and cached on disk.
 
 ---
 
@@ -56,7 +71,7 @@ Docs: https://flagcdn.com/
 - No key, no limits worth worrying about.
 - PNG by ISO 3166 code and width: `https://flagcdn.com/w320/co.png`
 - SVG: `https://flagcdn.com/co.svg`
-- Used by the `flag` and `club-country` trivia modes and for player nationalities.
+- Secondary: used for player nationalities, the `club-country` mode and the `flag` (national teams) mode.
 
 Note: England, Scotland and Wales use subdivision codes (`gb-eng`, `gb-sct`, `gb-wls`).
 

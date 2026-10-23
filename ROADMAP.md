@@ -58,7 +58,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 - [ ] `GameSession` + round loop with reveal stages
 - [ ] **Button** answers (4 options)
 - [ ] **Typed** answers with `matching.py` (fuzzy + aliases)
-- [ ] Modes `crest`, `blur`, `flag`, `league`
+- [ ] Modes `crest`, `blur`, `league`
 - [ ] SQLite DB: `games`, `answers`, `scores`
 - [ ] Server `/leaderboard`
 - [ ] `/trivia stop`, one game per channel
@@ -72,7 +72,7 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 ## Phase 3 — More image trivia
 
 - [ ] Effects `silhouette`, `zoom_crop`, `grayscale`
-- [ ] Modes `silhouette`, `zoom`, `club-country`, `stadium`
+- [ ] Modes `silhouette`, `zoom`, `club-country`, `flag`, `stadium`
 - [ ] Player dataset (API-Football): photo, nationality, position, clubs with years
 - [ ] `player` mode (blurred black and white photo)
 - [ ] `career` mode with a composite crest image

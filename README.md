@@ -1,6 +1,6 @@
 # FootballBot
 
-A Discord bot about football: **live league information** (matches, standings, top scorers, teams, players) and **image-based trivia** in the style of country-flag quiz bots — guess the club from a pixelated crest, a silhouette, the stadium, the kit, guess the player from their career path, and more.
+A Discord bot about football: **live league information** (matches, standings, top scorers, teams, players) and **image-based trivia** in the style of country-flag quiz bots, but with club crests — guess the club from a pixelated crest, a silhouette, the stadium, the kit, guess the player from their career path, and more.
 
 > Status: **planning**. There is no code yet; these documents define what we are building and how we organize the work.
 
@@ -16,12 +16,12 @@ A Discord bot about football: **live league information** (matches, standings, t
 - Generated image cards (standings table, player comparison, recent form).
 
 ### 2. Image trivia
-- **Pixelated / blurred crest** that gets revealed over time.
-- Crest **silhouette**, **zoom** into a piece of the crest.
-- **Flag** → guess the national team or a club's country.
+- **Pixelated / blurred crest** that gets revealed over time (the main mode).
+- Crest **silhouette**, **zoom** into a piece of the crest, **league logo**.
 - **Stadium**, **kit**, **player photo**.
 - **Career path**: a row of crests with years → who is the player?
 - **Higher or lower**, **3x3 grid**, **daily player** (Wordle style).
+- Extra: country **flags** for national teams and a club's country.
 - Points, streaks, per-server and global leaderboards.
 
 ### 3. Social
@@ -45,7 +45,7 @@ The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
 | Quality | `ruff`, `pytest`, GitHub Actions |
 | Extra (optional) | JS/TS for a web leaderboard dashboard later on |
 
-Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags and, optionally, **API-Football**.
+Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags (secondary) and, optionally, **API-Football**.
 
 ---
 
