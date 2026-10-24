@@ -1,0 +1,186 @@
+{
+  "filters": {
+    "season": "2026"
+  },
+  "area": {
+    "id": 2077,
+    "name": "Europe",
+    "code": "EUR",
+    "flag": "https://crests.football-data.org/EUR.svg"
+  },
+  "competition": {
+    "id": 2001,
+    "name": "UEFA Champions League",
+    "code": "CL",
+    "type": "CUP",
+    "emblem": "https://crests.football-data.org/CL.png"
+  },
+  "season": {
+    "id": 2557,
+    "startDate": "2026-09-08",
+    "endDate": "2027-01-27",
+    "currentMatchday": 4,
+    "winner": null
+  },
+  "standings": [
+    {
+      "stage": "LEAGUE_STAGE",
+      "type": "TOTAL",
+      "group": "League phase",
+      "table": [
+        {
+          "position": 1,
+          "team": {
+            "id": 524,
+            "name": "Paris Saint-Germain FC",
+            "shortName": "PSG",
+            "tla": "PSG",
+            "crest": "https://crests.football-data.org/524.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 3,
+          "draw": 0,
+          "lost": 0,
+          "points": 9,
+          "goalsFor": 14,
+          "goalsAgainst": 5,
+          "goalDifference": 9
+        },
+        {
+          "position": 2,
+          "team": {
+            "id": 58,
+            "name": "Aston Villa FC",
+            "shortName": "Aston Villa",
+            "tla": "AVL",
+            "crest": "https://crests.football-data.org/58.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 3,
+          "draw": 0,
+          "lost": 0,
+          "points": 9,
+          "goalsFor": 12,
+          "goalsAgainst": 3,
+          "goalDifference": 9
+        },
+        {
+          "position": 3,
+          "team": {
+            "id": 64,
+            "name": "Liverpool FC",
+            "shortName": "Liverpool",
+            "tla": "LIV",
+            "crest": "https://crests.football-data.org/64.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 3,
+          "draw": 0,
+          "lost": 0,
+          "points": 9,
+          "goalsFor": 12,
+          "goalsAgainst": 7,
+          "goalDifference": 5
+        },
+        {
+          "position": 4,
+          "team": {
+            "id": 86,
+            "name": "Real Madrid CF",
+            "shortName": "Real Madrid",
+            "tla": "RMA",
+            "crest": "https://crests.football-data.org/86.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 3,
+          "draw": 0,
+          "lost": 0,
+          "points": 9,
+          "goalsFor": 10,
+          "goalsAgainst": 5,
+          "goalDifference": 5
+        },
+        {
+          "position": 5,
+          "team": {
+            "id": 90,
+            "name": "Real Betis Balompié",
+            "shortName": "Real Betis",
+            "tla": "BET",
+            "crest": "https://crests.football-data.org/90.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 3,
+          "draw": 0,
+          "lost": 0,
+          "points": 9,
+          "goalsFor": 7,
+          "goalsAgainst": 4,
+          "goalDifference": 3
+        },
+        {
+          "position": 6,
+          "team": {
+            "id": 10,
+            "name": "VfB Stuttgart",
+            "shortName": "Stuttgart",
+            "tla": "VFB",
+            "crest": "https://crests.football-data.org/10.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 2,
+          "draw": 1,
+          "lost": 0,
+          "points": 7,
+          "goalsFor": 7,
+          "goalsAgainst": 2,
+          "goalDifference": 5
+        },
+        {
+          "position": 7,
+          "team": {
+            "id": 57,
+            "name": "Arsenal FC",
+            "shortName": "Arsenal",
+            "tla": "ARS",
+            "crest": "https://crests.football-data.org/57.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 2,
+          "draw": 1,
+          "lost": 0,
+          "points": 7,
+          "goalsFor": 6,
+          "goalsAgainst": 2,
+          "goalDifference": 4
+        },
+        {
+          "position": 8,
+          "team": {
+            "id": 81,
+            "name": "FC Barcelona",
+            "shortName": "Barça",
+            "tla": "FCB",
+            "crest": "https://crests.football-data.org/81.png"
+          },
+          "playedGames": 3,
+          "form": null,
+          "won": 2,
+          "draw": 0,
+          "lost": 1,
+          "points": 6,
+          "goalsFor": 11,
+          "goalsAgainst": 6,
+          "goalDifference": 5
+        }
+      ]
+    }
+  ]
+}

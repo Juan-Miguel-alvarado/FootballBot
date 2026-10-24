@@ -1,0 +1,295 @@
+{
+  "count": 6,
+  "filters": {
+    "season": "2026"
+  },
+  "competition": {
+    "id": 2014,
+    "name": "Primera Division",
+    "code": "PD",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/laliga.png"
+  },
+  "season": {
+    "id": 2518,
+    "startDate": "2026-08-16",
+    "endDate": "2027-05-30",
+    "currentMatchday": 10,
+    "winner": null
+  },
+  "teams": [
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 77,
+      "name": "Athletic Club",
+      "shortName": "Athletic",
+      "tla": "ATH",
+      "crest": "https://crests.football-data.org/77.png",
+      "address": "Ibaigane, Alameda Mazarredo, 23 Bilbao 48009",
+      "website": "http://www.athletic-club.eus",
+      "founded": 1898,
+      "clubColors": "Red / White / Black",
+      "venue": "San Mamés",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        }
+      ],
+      "coach": {
+        "id": 111241,
+        "firstName": "Edin",
+        "lastName": "Terzić",
+        "name": "Edin Terzić",
+        "dateOfBirth": "1982-10-30",
+        "nationality": "Germany",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2022-03-06T09:31:27Z"
+    },
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 78,
+      "name": "Club Atlético de Madrid",
+      "shortName": "Atleti",
+      "tla": "ATL",
+      "crest": "https://crests.football-data.org/78.png",
+      "address": "Paseo Virgen del Puerto, 67 Madrid 28005",
+      "website": "http://www.clubatleticodemadrid.com",
+      "founded": 1903,
+      "clubColors": "Red / White / Blue",
+      "venue": "Estadio Wanda Metropolitano",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        },
+        {
+          "id": 2001,
+          "name": "UEFA Champions League",
+          "code": "CL",
+          "type": "CUP",
+          "emblem": "https://crests.football-data.org/CL.png"
+        }
+      ],
+      "coach": {
+        "id": 132,
+        "firstName": "Diego",
+        "lastName": "Simeone",
+        "name": "Diego Simeone",
+        "dateOfBirth": "1970-04-28",
+        "nationality": "Argentina",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2026-07-04T11:58:34Z"
+    },
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 79,
+      "name": "CA Osasuna",
+      "shortName": "Osasuna",
+      "tla": "OSA",
+      "crest": "https://crests.football-data.org/79.png",
+      "address": "Calle del Sadar, s/n Pamplona 31006",
+      "website": "http://www.osasuna.es",
+      "founded": 1920,
+      "clubColors": "Red / Navy Blue",
+      "venue": "Estadio El Sadar",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        }
+      ],
+      "coach": {
+        "id": 166994,
+        "firstName": "Luis",
+        "lastName": "Ramis",
+        "name": "Luis Ramis",
+        "dateOfBirth": "1970-07-25",
+        "nationality": "Spain",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2024-07-29T17:09:06Z"
+    },
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 80,
+      "name": "RCD Espanyol de Barcelona",
+      "shortName": "Espanyol",
+      "tla": "ESP",
+      "crest": "https://crests.football-data.org/80.png",
+      "address": "Avenida Baix Llobregat, 100 Cornellà de Llobregat 08940",
+      "website": "http://www.rcdespanyol.com",
+      "founded": 1900,
+      "clubColors": "Blue / White",
+      "venue": "RCDE Stadium",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        }
+      ],
+      "coach": {
+        "id": 83316,
+        "firstName": "",
+        "lastName": "Manolo González",
+        "name": "Manolo González",
+        "dateOfBirth": "1979-01-14",
+        "nationality": "Spain",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2024-07-29T17:09:12Z"
+    },
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 81,
+      "name": "FC Barcelona",
+      "shortName": "Barça",
+      "tla": "FCB",
+      "crest": "https://crests.football-data.org/81.png",
+      "address": "Avenida Arístides Maillol s/n Barcelona 08028",
+      "website": "http://www.fcbarcelona.com",
+      "founded": 1899,
+      "clubColors": "Red / Navy Blue / Orange",
+      "venue": "Camp Nou",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        },
+        {
+          "id": 2001,
+          "name": "UEFA Champions League",
+          "code": "CL",
+          "type": "CUP",
+          "emblem": "https://crests.football-data.org/CL.png"
+        }
+      ],
+      "coach": {
+        "id": 133997,
+        "firstName": "Hansi",
+        "lastName": "Flick",
+        "name": "Hansi Flick",
+        "dateOfBirth": "1965-02-24",
+        "nationality": "Germany",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2024-07-29T17:09:22Z"
+    },
+    {
+      "area": {
+        "id": 2224,
+        "name": "Spain",
+        "code": "ESP",
+        "flag": "https://crests.football-data.org/760.svg"
+      },
+      "id": 82,
+      "name": "Getafe CF",
+      "shortName": "Getafe",
+      "tla": "GET",
+      "crest": "https://crests.football-data.org/82.png",
+      "address": "Avenida Teresa de Calcuta, s/n Getafe 28903",
+      "website": "http://www.getafecf.com",
+      "founded": 1946,
+      "clubColors": "Blue / White",
+      "venue": "Coliseum Alfonso Pérez",
+      "runningCompetitions": [
+        {
+          "id": 2014,
+          "name": "Primera Division",
+          "code": "PD",
+          "type": "LEAGUE",
+          "emblem": "https://crests.football-data.org/laliga.png"
+        },
+        {
+          "id": 2154,
+          "name": "UEFA Conference League",
+          "code": "UCL",
+          "type": "CUP",
+          "emblem": "https://crests.football-data.org/UCL.png"
+        }
+      ],
+      "coach": {
+        "id": 3155,
+        "firstName": "",
+        "lastName": "José Bordalás",
+        "name": "Pepe Bordalás",
+        "dateOfBirth": "1964-03-05",
+        "nationality": "Spain",
+        "contract": {
+          "start": null,
+          "until": null
+        }
+      },
+      "squad": [],
+      "staff": [],
+      "lastUpdated": "2022-02-25T16:43:35Z"
+    }
+  ]
+}
