@@ -2,6 +2,8 @@
 
 Mark tasks with `[x]` when done and put the owner's name next to them: `- [ ] Task — @name`.
 
+**Current status:** Phase 0 and Phase 1 done. Next up: **Phase 2 — first trivia**.
+
 ---
 
 ## Work areas
@@ -19,33 +21,40 @@ Each area works on its own branch and keeps it up to date with `main` (`git pull
 
 ---
 
-## Phase 0 — Setup
+## Phase 0 — Setup ✅
 
-- [ ] Create the GitHub repo and invite everyone
-- [ ] Create the bot application in the [Discord Developer Portal](https://discord.com/developers/applications) and share the token through a private channel (never through the repo)
-- [ ] Create a Discord test server with `#dev-bot`, `#trivia-test`, `#errors` channels
-- [ ] Create accounts and get keys for the APIs in [APIS.md](APIS.md); record the real limits there
-- [ ] Project skeleton: `pyproject.toml`, `.env.example`, `.gitignore`, folder structure
-- [ ] `ruff` + `pytest` + a GitHub Action that runs both on every PR
-- [ ] Decide the bot's name/avatar
+- [x] Create the GitHub repo and invite everyone — @Juan-Miguel-alvarado
+- [x] Create the bot application in the [Discord Developer Portal](https://discord.com/developers/applications) (**FootballTrivia**) and share the token through a private channel (never through the repo) — @Juan-Miguel-alvarado
+- [x] Create a Discord test server (uses `🧪-testing` and `🤖-bot-commands` for the bot)
+- [ ] Create an `#errors` channel and put its ID in `DISCORD_ERRORS_CHANNEL_ID` so tracebacks get posted there
+- [x] Create accounts and get keys for the APIs in [APIS.md](APIS.md); record the real limits there — @Juan-Miguel-alvarado
+- [x] Project skeleton: `pyproject.toml`, `.env.example`, `.gitignore`, folder structure — @Juan-Miguel-alvarado
+- [x] `ruff` + `pytest` + a GitHub Action that runs both on every PR — @Juan-Miguel-alvarado
+- [ ] Decide the bot's name/avatar (the application is called *FootballTrivia* for now)
 
-**Done when:** anyone can clone, fill in `.env`, and the bot shows up online on the test server.
+**Done when:** anyone can clone, fill in `.env`, and the bot shows up online on the test server. ✅
 
 ---
 
-## Phase 1 — Basic bot + info (MVP)
+## Phase 1 — Basic bot + info (MVP) ✅
 
-- [ ] `bot.py`: load cogs and sync commands to the test server
-- [ ] `/ping`, `/help`, `/leagues`
-- [ ] Shared models (`Team`, `Match`, `Standing`, `Player`) + base `FootballProvider`
-- [ ] football-data.org provider with TTL cache
-- [ ] `/matches`, `/live`
-- [ ] `/standings` (text embed first)
-- [ ] `/team` with crest
-- [ ] Autocomplete for leagues and teams
-- [ ] Error handling: friendly message to the user + traceback to the `#errors` channel
+- [x] `bot.py`: load cogs and sync commands to the test server — @Juan-Miguel-alvarado
+- [x] `/ping`, `/help`, `/leagues` — @Juan-Miguel-alvarado
+- [x] Shared models (`Team`, `Match`, `Standing`, `Player`) + base `FootballProvider` — @Juan-Miguel-alvarado
+- [x] football-data.org provider with TTL cache and a 10 requests/minute rate limiter — @Juan-Miguel-alvarado
+- [x] `/matches`, `/live` — @Juan-Miguel-alvarado
+- [x] `/standings` (text embed first) — @Juan-Miguel-alvarado
+- [x] `/team` with crest, recent form and next match — @Juan-Miguel-alvarado
+- [x] Autocomplete for leagues, teams and dates — @Juan-Miguel-alvarado
+- [x] Error handling: friendly message to the user + traceback to the `#errors` channel — @Juan-Miguel-alvarado
+- [ ] Everyone tries every command on the test server and reports anything odd in `🐛-bug-reports`
 
 **Done when:** you can check matches and standings for the top 5 leagues without the bot crashing.
+
+Notes from building it:
+- The free plan covers **13** competitions, Copa Libertadores included (see [APIS.md](APIS.md)).
+- `/live` shows the score but not the minute: the free plan does not send it.
+- Team autocomplete reads an in-memory index that loads all 13 competitions in the background at startup (about 3 minutes, spaced out to leave quota for commands) and refreshes daily.
 
 ---
 
