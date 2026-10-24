@@ -2,6 +2,8 @@
 
 ## Workflow
 
+New to the code? Read [GUIA.md](GUIA.md) first: a map of every file and how a command flows through the bot.
+
 1. Pick a task from [ROADMAP.md](ROADMAP.md) (or an issue) and put your name on it.
 2. Branch off your area branch (`feat/bot`, `feat/data`, `feat/images`, `feat/games` — see [ROADMAP.md](ROADMAP.md#work-areas)), or off `main` for general changes:
    - `feat/trivia-silhouette`
@@ -27,7 +29,9 @@
 ## Code style
 
 - Python 3.12+, **type hints** everywhere.
-- Code and user-facing text in **English** (Spanish later through a translations file).
+- Names (variables, functions, classes) and user-facing text in **English** (Spanish later through a translations file).
+- **Comments and docstrings in Spanish**, so the whole team can follow the code. Every file starts with a docstring saying what it does, who uses it and how to extend it; keep that up to date.
+- Don't put docstrings on slash command functions: discord.py reads them. Use `#` comments there.
 - Functions in `imaging/` are pure: image in, image out.
 - No HTTP calls from `cogs/`: always go through `services/`.
 - Anything blocking (Pillow, disk) goes through `asyncio.to_thread`.

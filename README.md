@@ -2,7 +2,7 @@
 
 A Discord bot about football: **live league information** (matches, standings, top scorers, teams, players) and **image-based trivia** in the style of country-flag quiz bots, but with club crests — guess the club from a pixelated crest, a silhouette, the stadium, the kit, guess the player from their career path, and more.
 
-> Status: **planning**. There is no code yet; these documents define what we are building and how we organize the work.
+> Status: **Phase 1 done** — the bot runs with `/matches`, `/live`, `/standings`, `/team`, `/leagues`, `/ping` and `/help`. Next: the first crest trivia (Phase 2). See [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -54,6 +54,7 @@ Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSpo
 | File | Purpose |
 |---|---|
 | [README.md](README.md) | This overview |
+| [GUIA.md](GUIA.md) | **Code guide (Spanish)**: where everything is and how a command flows through the bot. Start here before touching the code |
 | [ROADMAP.md](ROADMAP.md) | Phases, tasks and work areas to split between us |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the bot is built internally: folders, data, images |
 | [APIS.md](APIS.md) | Free APIs we use, their limits and sign-up links |
@@ -62,24 +63,34 @@ Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSpo
 
 ---
 
-## Getting started (once there is code)
+## Getting started
 
 ```bash
 git clone https://github.com/Juan-Miguel-alvarado/FootballBot.git && cd FootballBot
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 cp .env.example .env      # then fill in the keys
 python -m footballbot
 ```
 
-Planned environment variables:
+Environment variables (all documented in [.env.example](.env.example)):
 
 ```env
 DISCORD_TOKEN=
 DISCORD_DEV_GUILD_ID=        # test server: slash commands sync instantly there
+DISCORD_ERRORS_CHANNEL_ID=   # optional: channel that receives error tracebacks
 FOOTBALL_DATA_KEY=
-THESPORTSDB_KEY=123            # public free key
+THESPORTSDB_KEY=123          # public free key
 DATABASE_URL=sqlite:///data/footballbot.db
+TIMEZONE=America/Bogota      # "today" and kick-off times
+LOG_LEVEL=INFO
+```
+
+Checks (the same ones CI runs on every PR):
+
+```bash
+ruff check . && ruff format --check .
+pytest
 ```
 
 > Never commit `.env` or the bot token. If a token leaks, regenerate it in the Discord Developer Portal immediately.

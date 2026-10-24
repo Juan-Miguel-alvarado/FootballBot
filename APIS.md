@@ -34,10 +34,10 @@ The crest URL is stored in the trivia dataset; images are downloaded once and ca
 
 Docs: https://docs.football-data.org/general/v4/index.html
 
-**Free tier:**
-- 10 requests per minute.
-- 12 competitions: Premier League, Championship, La Liga, Serie A, Bundesliga, Ligue 1, Eredivisie, Primeira Liga, Brasileirao Serie A, Champions League, World Cup, European Championship.
-- Fixtures, results, standings, top scorers, teams with crest URL (confirm scorers and crests once the key works).
+**Free tier (confirmed with our key, 2026-10-24):**
+- 10 requests per minute. Every response carries `X-Requests-Available-Minute` and `X-RequestCounter-Reset` (seconds until the counter resets); a 429 means wait that long.
+- 13 competitions (`/v4/competitions`): Premier League `PL`, Championship `ELC`, La Liga `PD`, Serie A `SA`, Bundesliga `BL1`, Ligue 1 `FL1`, Eredivisie `DED`, Primeira Liga `PPL`, Brasileirao Serie A `BSA`, Champions League `CL`, **Copa Libertadores `CLI`**, World Cup `WC`, European Championship `EC`.
+- Fixtures, results, standings, top scorers, teams with crest URL, coach and **full squads** (name, position, birth date, nationality).
 - Current season only.
 
 **Not included:**
@@ -45,6 +45,14 @@ Docs: https://docs.football-data.org/general/v4/index.html
 - Lineups, substitutions, cards, match stats, odds.
 
 **Auth:** header `X-Auth-Token: <FOOTBALL_DATA_KEY>`.
+
+**Gotchas found while building Phase 1:**
+- `dateTo` is **exclusive**: `dateFrom=2026-10-25&dateTo=2026-10-25` returns nothing; use `dateTo=2026-10-26` for one day. Dates are UTC, so a local day can span two UTC days.
+- `status=LIVE` works as a filter (`IN_PLAY` + `PAUSED`). Live matches carry the current score in `score.fullTime`, but **no minute**.
+- `/teams/{id}/matches?dateFrom=&dateTo=` returns the team's matches sorted by date: one request gives recent form and the next match.
+- Tournaments with no current table (e.g. `WC` between editions) return **404** on `/standings`.
+- Knockout fixtures can list undecided teams with `id: null` and `name: null`.
+- `/competitions/{code}/teams` includes every squad (~70 KB per league).
 
 ---
 
@@ -104,14 +112,15 @@ Not tested yet.
 
 | Feature | Source | Works on free? |
 |---|---|---|
-| `/matches`, `/standings`, `/scorers`, `/team` | football-data.org | Yes, for the 12 competitions |
+| `/matches`, `/standings`, `/scorers`, `/team` | football-data.org | Yes, for the 13 competitions |
 | `/live`, `/follow` alerts | football-data.org | Yes, but **delayed** |
 | Crest / silhouette / zoom / blur trivia | football-data.org crests + TheSportsDB | Yes |
 | Stadium / kit trivia | TheSportsDB | Yes |
 | Flag trivia | flagcdn | Yes |
 | Player / career / who-am-i trivia, `/daily` | TheSportsDB (+ Wikidata backup) | Yes |
 | `/player`, `/squad` | football-data.org squads + TheSportsDB details | Yes (confirm squads once the key works) |
-| Liga BetPlay, Libertadores | No free source with current data | Out of scope for now |
+| Copa Libertadores | football-data.org (`CLI`) | Yes |
+| Liga BetPlay | No free source with current data | Out of scope for now |
 
 ---
 

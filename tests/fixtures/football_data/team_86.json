@@ -1,0 +1,71 @@
+{
+  "area": {
+    "id": 2224,
+    "name": "Spain",
+    "code": "ESP",
+    "flag": "https://crests.football-data.org/760.svg"
+  },
+  "id": 86,
+  "name": "Real Madrid CF",
+  "shortName": "Real Madrid",
+  "tla": "RMA",
+  "crest": "https://crests.football-data.org/86.png",
+  "address": "Avenida Concha Espina, 1 Madrid 28036",
+  "website": "http://www.realmadrid.com",
+  "founded": 1902,
+  "clubColors": "White / Purple",
+  "venue": "Estadio Santiago Bernabéu",
+  "runningCompetitions": [
+    {
+      "id": 2014,
+      "name": "Primera Division",
+      "code": "PD",
+      "type": "LEAGUE",
+      "emblem": "https://crests.football-data.org/laliga.png"
+    },
+    {
+      "id": 2001,
+      "name": "UEFA Champions League",
+      "code": "CL",
+      "type": "CUP",
+      "emblem": "https://crests.football-data.org/CL.png"
+    }
+  ],
+  "coach": {
+    "id": 11613,
+    "firstName": "",
+    "lastName": "José Mourinho",
+    "name": "José Mourinho",
+    "dateOfBirth": "1963-01-26",
+    "nationality": "Portugal",
+    "contract": {
+      "start": null,
+      "until": null
+    }
+  },
+  "squad": [
+    {
+      "id": 3641,
+      "name": "Thibaut Courtois",
+      "position": "Goalkeeper",
+      "dateOfBirth": "1992-05-11",
+      "nationality": "Belgium"
+    },
+    {
+      "id": 28995,
+      "name": "Andriy Lunin",
+      "position": "Goalkeeper",
+      "dateOfBirth": "1999-02-11",
+      "nationality": "Ukraine"
+    },
+    {
+      "id": 1337,
+      "name": "Éder Militão",
+      "position": "Defence",
+      "dateOfBirth": "1998-01-18",
+      "nationality": "Brazil"
+    }
+  ],
+  "staff": [],
+  "lastUpdated": "2022-02-19T08:59:31Z"
+}
