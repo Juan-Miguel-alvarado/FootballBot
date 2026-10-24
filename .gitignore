@@ -6,3 +6,6 @@ data/cache/
 *.db
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
+build/
+dist/
