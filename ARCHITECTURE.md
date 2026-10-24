@@ -52,7 +52,9 @@ FootballBot/
 │   ├── __main__.py            # entry point: python -m footballbot
 │   ├── bot.py                 # commands.Bot subclass, loads cogs, syncs commands
 │   ├── config.py              # pydantic-settings, reads .env
+│   ├── errors.py              # UserFacingError: messages safe to show as is
 │   ├── cogs/
+│   │   ├── common.py          # autocomplete, argument parsing, embed helpers
 │   │   ├── info.py            # /matches /standings /team /player ...
 │   │   ├── trivia.py          # /trivia, /hint, answer buttons
 │   │   ├── daily.py           # /daily
@@ -60,7 +62,9 @@ FootballBot/
 │   │   ├── follow.py          # /follow + periodic alert task
 │   │   └── admin.py           # /config /ping /help
 │   ├── services/
-│   │   ├── football.py        # facade over providers + cache
+│   │   ├── football.py        # facade over providers + team index for autocomplete
+│   │   ├── leagues.py         # supported competitions, codes, emoji, aliases
+│   │   ├── text.py            # normalize(): lowercase, no accents (search and matching)
 │   │   ├── trivia/
 │   │   │   ├── session.py     # GameSession: state of a game in a channel
 │   │   │   ├── modes.py       # one question generator per mode
@@ -68,7 +72,8 @@ FootballBot/
 │   │   ├── scoring.py
 │   │   └── notifier.py
 │   ├── providers/
-│   │   ├── base.py            # FootballProvider protocol
+│   │   ├── base.py            # FootballProvider protocol + provider errors
+│   │   ├── ratelimit.py       # sliding window limiter (10 requests/minute)
 │   │   ├── football_data.py
 │   │   ├── thesportsdb.py
 │   │   ├── wikidata.py
@@ -90,8 +95,8 @@ FootballBot/
 │   └── build_dataset.py       # builds the trivia dataset from the APIs
 ├── tests/
 ├── .env.example
-├── requirements.txt / pyproject.toml
-└── Dockerfile
+├── pyproject.toml             # dependencies, ruff and pytest config
+└── Dockerfile                 # (Phase 6)
 ```
 
 ---
@@ -102,7 +107,7 @@ All sources are free. Details, limits and sign-up links are in [APIS.md](APIS.md
 
 | Source | Used for |
 |---|---|
-| football-data.org | Matches, standings, scorers, teams and crests for 12 competitions |
+| football-data.org | Matches, standings, scorers, teams and crests for 13 competitions |
 | TheSportsDB | Crests, kits, stadiums, colors, year founded, players and career paths (trivia dataset) |
 | flagcdn | Flags |
 | Wikidata | Backup for player career paths |
@@ -141,11 +146,16 @@ Generated file (`data/dataset/teams.json`), example record:
 
 | What | Where | Lifetime |
 |---|---|---|
-| HTTP responses | memory (`cachetools.TTLCache`) | per endpoint: 30 s live, 1 h standings, 1 day teams |
+| HTTP responses | memory (`cachetools.TTLCache`) | per endpoint: 30 s live, 5 min matches, 10 min standings, 1 day teams |
+| Team index (autocomplete) | memory, `FootballService` | loaded in the background at startup, refreshed daily |
 | Original images | disk, `data/cache/img/<hash>.png` | indefinite |
 | Processed images (pixelation stages) | memory, LRU | duration of the game |
 
 SVG crests are converted to PNG with `cairosvg` when downloaded.
+
+All football-data.org calls go through one `RateLimiter` (10 per minute, FIFO). On a 429 the provider waits for `X-RequestCounter-Reset` and retries once if that is under 20 s; otherwise the user gets a "try again in a minute" message.
+
+**Autocomplete never calls an API**: Discord expects an answer in under 3 s, so team suggestions come from an in-memory index of every team in the 13 competitions. It is built at startup with one request every 12 s (about 3 minutes) to leave quota for commands.
 
 ---
 
@@ -248,6 +258,16 @@ The core is Python. JS/TS only comes in where it adds value:
 - `Dockerfile` (python-slim + libcairo for SVG).
 - Options: a cheap VPS, Railway/Fly.io, or a Raspberry Pi at home. It must run 24/7 for `/follow` and `/daily`.
 - Standard `logging` to stdout; command errors are reported to a private channel on the dev server.
+
+## Error handling
+
+`bot.on_app_command_error` turns every exception into a short ephemeral message:
+
+| Error | User sees | Reported to `#errors` |
+|---|---|---|
+| `UserFacingError` | its message (bad date, unknown league or team...) | No |
+| `NotFoundError` / `RateLimitedError` / `ProviderError` | "couldn't find that" / "API busy" / "service not responding" | No (logged) |
+| Anything else | "Something went wrong" | Yes, with traceback |
 
 ---
 
