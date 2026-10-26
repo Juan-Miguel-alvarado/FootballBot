@@ -3,9 +3,11 @@
 Quién lo usa: `__main__.py` crea `FootballBot(settings)` y llama `bot.run(...)`.
 
 Qué pasa al arrancar (en orden):
-1. `__init__`: crea el cliente de la API (provider) y el FootballService.
-2. `setup_hook`: carga los cogs de EXTENSIONS (cada cog registra sus slash commands)
-   y los sincroniza con Discord para que aparezcan al escribir "/".
+1. `__init__`: crea el cliente de la API (provider), el FootballService, la base de datos
+   y el descargador de imágenes. Todos los cogs los usan a través de `self.bot`.
+2. `setup_hook`: abre la base de datos (y aplica migraciones), carga los cogs de EXTENSIONS
+   (cada cog registra sus slash commands) y los sincroniza con Discord para que aparezcan
+   al escribir "/".
 3. `on_ready`: ya está conectado; lo anota en el log.
 
 Para añadir un archivo de comandos nuevo (un cog): créalo en `cogs/`, con una función
@@ -22,9 +24,11 @@ from discord.ext import commands
 
 from footballbot.config import Settings
 from footballbot.errors import UserFacingError
+from footballbot.imaging.loader import ImageLoader
 from footballbot.providers.base import NotFoundError, ProviderError, RateLimitedError
 from footballbot.providers.football_data import FootballDataProvider
 from footballbot.services.football import FootballService
+from footballbot.storage.db import Database
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +36,7 @@ log = logging.getLogger(__name__)
 EXTENSIONS = (
     "footballbot.cogs.admin",
     "footballbot.cogs.info",
+    "footballbot.cogs.trivia",
 )
 
 # Discord messages are capped at 2000 characters
@@ -40,22 +45,27 @@ MAX_TRACEBACK = 1800
 
 class FootballBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
-        # Slash commands only need guilds. Typed trivia answers will add message_content.
+        # Slash commands only need guilds. Typed trivia answers add message_content.
         # (Los "intents" son los tipos de eventos que Discord nos manda. message_content es
-        # privilegiado: hay que activarlo en el Developer Portal cuando lo necesitemos.)
+        # privilegiado: hay que activarlo en el Developer Portal antes de poner
+        # TRIVIA_TYPED_ANSWERS=true, o Discord rechaza la conexión.)
         intents = discord.Intents(guilds=True, guild_messages=True)
+        intents.message_content = settings.trivia_typed_answers
         # command_prefix es obligatorio en commands.Bot, pero no usamos comandos con prefijo
         # (tipo "!help"): todo son slash commands. help_command=None quita el "!help" automático.
         super().__init__(command_prefix=commands.when_mentioned, intents=intents, help_command=None)
         self.settings = settings
-        # Estos dos objetos viven mientras el bot está encendido y los comparten todos los cogs.
+        # Estos objetos viven mientras el bot está encendido y los comparten todos los cogs.
         self.provider = FootballDataProvider(settings.football_data_key.get_secret_value())
         self.football = FootballService(self.provider, settings.tz)
+        self.db = Database(settings.database_url)
+        self.images = ImageLoader()
         # Todos los errores de slash commands pasan por on_app_command_error (más abajo).
         self.tree.on_error = self.on_app_command_error
 
     async def setup_hook(self) -> None:
         """discord.py lo llama una vez, antes de conectarse. Aquí se cargan los cogs."""
+        await self.db.connect()
         for extension in EXTENSIONS:
             await self.load_extension(extension)
         await self.sync_commands()
@@ -78,9 +88,19 @@ class FootballBot(commands.Bot):
     async def on_ready(self) -> None:
         log.info("Logged in as %s (%s) in %d guilds", self.user, self.user.id, len(self.guilds))
 
+    async def on_message(self, message: discord.Message) -> None:
+        # No hacemos nada a propósito. Por defecto discord.py intenta leer cada mensaje que
+        # menciona al bot como un comando con prefijo ("@bot help"); como no usamos esos
+        # comandos, solo llenaba el log de errores "CommandNotFound". Los cogs que necesitan
+        # mensajes (la trivia con respuestas escritas) usan su propio listener y siguen
+        # funcionando.
+        return
+
     async def close(self) -> None:
-        """Al apagar el bot (Ctrl+C) cerramos también las conexiones HTTP de la API."""
+        """Al apagar el bot (Ctrl+C) cerramos también la API, las imágenes y la base de datos."""
         await self.provider.aclose()
+        await self.images.aclose()
+        await self.db.close()
         await super().close()
 
     # --- errors ----------------------------------------------------------------------------
