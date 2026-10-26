@@ -37,14 +37,14 @@ Every team/player/league argument uses **autocomplete** (Discord suggests while 
 
 ### How it plays
 
-- `/trivia <mode> [difficulty] [rounds]` starts a game in the channel.
+- `/trivia start <mode> [difficulty] [rounds] [answers]` starts a game in the channel (1-20 rounds, 10 by default).
 - **One game per channel** at a time.
 - Two ways to answer (configurable per mode):
   - **Buttons** — 4 options, each player answers once. Fast and does not need to read chat.
-  - **Typed** — answer in chat. Tolerates typos and nicknames (`barca`, `atleti`, `juve`, `spurs`). Requires the *Message Content* intent.
-- Images are **revealed in stages** (e.g. less pixelated every 5 s). Answering earlier gives more points.
-- `/trivia stop` ends the game. `/hint` spends points on a text hint.
-- Difficulty: **easy** (Europe's top 5 leagues), **medium** (+ South America, Portugal, Netherlands, MLS...), **hard** (smaller leagues, historic crests).
+  - **Typed** — answer in chat. Tolerates typos and nicknames (`barca`, `atleti`, `juve`, `spurs`). Requires the *Message Content* intent and `TRIVIA_TYPED_ANSWERS=true`.
+- Images are **revealed in stages**: 4 stages of 5 s. Points by stage: 100 / 75 / 50 / 25, plus +10 per round won in a row (up to +50). The first correct answer wins the round; with buttons, a wrong answer locks you out of that round.
+- `/trivia stop` ends the game (whoever started it, or someone with *Manage Messages*). `/hint` (v2) will spend points on a text hint.
+- Difficulty: **easy** (Europe's top 5 leagues), **medium** (+ Eredivisie, Primeira Liga, Brasileirão, Champions League clubs), **hard** (+ Championship and Copa Libertadores).
 
 ### Modes
 
@@ -83,7 +83,7 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 
 | Command | What it does | Image | Priority |
 |---|---|---|---|
-| `/leaderboard [server\|global] [mode]` | Points table | Generated card | MVP |
+| `/leaderboard [mode]` | Server points table (global ranking in Phase 5) | Text now, generated card later | MVP |
 | `/profile [user]` | Points, accuracy, streak, favorite mode | **Profile card** with Discord avatar | v2 |
 | `/achievements` | Unlocked badges (100 crests, 10-answer streak, etc.) | Badge grid | Idea |
 | `/pool create <league> <matchday>` | Prediction pool for a matchday; everyone submits their score | — | Idea |

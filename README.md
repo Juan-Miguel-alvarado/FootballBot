@@ -2,7 +2,7 @@
 
 A Discord bot about football: **live league information** (matches, standings, top scorers, teams, players) and **image-based trivia** in the style of country-flag quiz bots, but with club crests — guess the club from a pixelated crest, a silhouette, the stadium, the kit, guess the player from their career path, and more.
 
-> Status: **Phase 1 done** — the bot runs with `/matches`, `/live`, `/standings`, `/team`, `/leagues`, `/ping` and `/help`. Next: the first crest trivia (Phase 2). See [ROADMAP.md](ROADMAP.md).
+> Status: **Phase 2 done (MVP)**: football info (`/matches`, `/live`, `/standings`, `/team`, `/leagues`) and crest trivia (`/trivia start`, `/trivia stop`, `/leaderboard`). Next: Phase 3, more trivia modes. See [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -38,7 +38,7 @@ The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
 | Main language | **Python 3.12+** |
 | Discord | [`discord.py`](https://discordpy.readthedocs.io/) 2.x (slash commands, buttons, select menus, autocomplete) |
 | HTTP | `httpx` (async) |
-| Images | `Pillow` (+ `cairosvg` for SVG crests) |
+| Images | `Pillow` |
 | Database | SQLite with `aiosqlite` at first, PostgreSQL if it grows |
 | Answer matching | `rapidfuzz` + `unidecode` |
 | Config | `.env` + `pydantic-settings` |
@@ -82,6 +82,7 @@ DISCORD_ERRORS_CHANNEL_ID=   # optional: channel that receives error tracebacks
 FOOTBALL_DATA_KEY=
 THESPORTSDB_KEY=123          # public free key
 DATABASE_URL=sqlite:///data/footballbot.db
+TRIVIA_TYPED_ANSWERS=false  # true only after enabling the Message Content intent
 TIMEZONE=America/Bogota      # "today" and kick-off times
 LOG_LEVEL=INFO
 ```

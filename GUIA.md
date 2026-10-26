@@ -41,6 +41,8 @@ footballbot/
 │
 ├── cogs/                    ── COMANDOS DE DISCORD ──
 │   ├── info.py              /matches /live /standings /team /leagues + cómo se ven (formato)
+│   ├── trivia.py            /trivia start, /trivia stop, /leaderboard, los botones y el
+│   │                        bucle de rondas (mandar imagen, esperar, aclarar, revelar)
 │   ├── admin.py             /ping /help
 │   └── common.py            Autocompletado, leer fechas y ligas, repartir embeds largos
 │
@@ -48,7 +50,21 @@ footballbot/
 │   ├── football.py          FootballService: partidos del día, en vivo, tablas, perfil de equipo,
 │   │                        y el índice de equipos para el autocompletado
 │   ├── leagues.py           Las 13 ligas: código, nombre, bandera, apodos
-│   └── text.py              normalize(): "Atlético!" → "atletico" (para buscar)
+│   ├── text.py              normalize(): "Atlético!" → "atletico" (para buscar)
+│   └── trivia/
+│       ├── dataset.py       Lee data/dataset/*.json y los apodos → TriviaItem
+│       ├── modes.py         Los modos (crest, blur, league), dificultades y QuestionPicker
+│       ├── session.py       GameSession: reglas de una partida (rondas, puntos, rachas)
+│       └── matching.py      ¿La respuesta escrita es correcta? (tildes, "FC", errores)
+│
+├── imaging/                 ── IMÁGENES ──
+│   ├── loader.py            Descarga escudos y los guarda en data/cache/img/
+│   └── effects.py           Pixelar y desenfocar (funciones puras con Pillow)
+│
+├── storage/                 ── BASE DE DATOS (SQLite) ──
+│   ├── db.py                Conexión y migraciones
+│   ├── migrations/          001_init.sql: tablas games, answers, scores
+│   └── repos.py             save_game(), leaderboard()
 │
 ├── providers/               ── APIs EXTERNAS ──
 │   ├── football_data.py     Cliente de football-data.org: caché + HTTP + JSON → models
@@ -56,12 +72,22 @@ footballbot/
 │   └── base.py              Qué métodos debe tener un provider + errores de API
 │
 └── models/
-    └── football.py          Team, Match, Standing, StandingRow, Player, Competition
+    ├── football.py          Team, Match, Standing, StandingRow, Player, Competition
+    └── trivia.py            TriviaItem, Question, PlayerScore, AnswerRecord, GameResult
+
+data/dataset/                ── DATOS DE LA TRIVIA (en el repo) ──
+├── teams.json               226 clubes con escudo y dificultad (lo genera el script)
+├── leagues.json             Logos de las 13 ligas (lo genera el script)
+└── aliases.json             Apodos de los clubes, A MANO: "barca", "los blancos"...
+
+scripts/build_dataset.py     Regenera teams.json y leagues.json desde football-data.org
 
 tests/
 ├── test_football_data.py    El provider, con respuestas reales guardadas (sin internet)
 ├── test_football_service.py La lógica, con un provider falso
 ├── test_leagues_and_parsing.py  Ligas, fechas, helpers de embeds
+├── test_trivia_rules.py     Respuestas escritas, dataset real, modos, reglas de puntos
+├── test_imaging_and_storage.py  Efectos, caché de imágenes, base de datos
 ├── conftest.py              load_fixture()
 └── fixtures/football_data/  Respuestas reales de la API en JSON
 ```
@@ -95,11 +121,30 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 
 ---
 
+## Recorrido completo: una partida de trivia
+
+`/trivia start mode:crest` en un canal:
+
+| Paso | Dónde | Qué pasa |
+|---|---|---|
+| 1 | [cogs/trivia.py](footballbot/cogs/trivia.py) `start()` | Revisa que no haya otra partida en el canal y que el bot tenga permisos. Elige las preguntas posibles con `pool_for` ([modes.py](footballbot/services/trivia/modes.py)) y crea una `GameSession` ([session.py](footballbot/services/trivia/session.py)) |
+| 2 | mismo | Responde "Trivia · Pixelated crest, 10 rounds..." y lanza `_run_game` en segundo plano. El comando termina ahí; el juego sigue solo |
+| 3 | `_next_question()` | `QuestionPicker` da la respuesta y 3 opciones falsas (2 del mismo país si se puede). El escudo sale de [imaging/loader.py](footballbot/imaging/loader.py): del disco si ya está, si no lo descarga |
+| 4 | `_play_round()` | `render_stage` ([imaging/effects.py](footballbot/imaging/effects.py)) pixela el escudo. Se manda con los 4 botones (`AnswerView`) |
+| 5 | mismo | Espera hasta 5 s a que alguien acierte (`session.round_over`). Si nadie acierta, pasa a la etapa siguiente y edita el mensaje con una imagen más clara. Son 4 etapas |
+| 6 | `AnswerView` o `on_message` | Cada clic (o mensaje, si las respuestas son escritas) va a `session.answer(...)`, que decide si es correcta y cuántos puntos da (100/75/50/25 + racha) |
+| 7 | `_play_round()` | Revela el escudo limpio, pinta el botón correcto de verde y muestra quién ganó |
+| 8 | `_finish_game()` | Tras la última ronda (o `/trivia stop`), `save_game` ([storage/repos.py](footballbot/storage/repos.py)) guarda la partida y suma los puntos a la tabla `scores`; se muestra el ranking |
+
+`/leaderboard` solo lee la tabla `scores` con `leaderboard()` en [storage/repos.py](footballbot/storage/repos.py).
+
+---
+
 ## Qué pasa al arrancar
 
 1. `python -m footballbot` → [`__main__.py`](footballbot/__main__.py) lee el `.env` con `Settings` ([config.py](footballbot/config.py)). Si falta algo, dice qué variable.
-2. Crea `FootballBot` ([bot.py](footballbot/bot.py)), que crea el provider y el `FootballService` (uno solo para todo el bot).
-3. `setup_hook` carga los cogs de `EXTENSIONS` y sincroniza los comandos con el servidor de pruebas (`DISCORD_DEV_GUILD_ID`): así aparecen al escribir `/`.
+2. Crea `FootballBot` ([bot.py](footballbot/bot.py)), que crea el provider, el `FootballService`, la base de datos (`bot.db`) y el descargador de imágenes (`bot.images`). Uno solo de cada uno para todo el bot.
+3. `setup_hook` abre la base de datos (crea `data/footballbot.db` y aplica las migraciones que falten), carga los cogs de `EXTENSIONS` y sincroniza los comandos con el servidor de pruebas (`DISCORD_DEV_GUILD_ID`): así aparecen al escribir `/`. Al cargar [cogs/trivia.py](footballbot/cogs/trivia.py) se lee el dataset.
 4. Al cargar [cogs/info.py](footballbot/cogs/info.py) arranca la tarea `refresh_teams`: va llenando el índice de equipos para el autocompletado de `/team`, una liga cada 12 s (~3 min en total) para no gastar toda la cuota. Se repite cada 24 h.
 5. `on_ready`: el log dice `Logged in as FootballTrivia#...`.
 
@@ -118,6 +163,11 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | **Un campo nuevo en un modelo** | [models/football.py](footballbot/models/football.py) y la función `_team`/`_match`/... que lo llena en [football_data.py](footballbot/providers/football_data.py) |
 | **Una variable de configuración** | [config.py](footballbot/config.py) y [.env.example](.env.example) |
 | **Un mensaje de error** | `on_app_command_error` en [bot.py](footballbot/bot.py) |
+| **Un apodo para la trivia** | [data/dataset/aliases.json](data/dataset/aliases.json). No hace falta regenerar nada; al reiniciar el bot ya cuenta |
+| **Un modo de trivia nuevo** | El efecto en [imaging/effects.py](footballbot/imaging/effects.py) (y en `EFFECTS`) + una entrada en `MODES` de [modes.py](footballbot/services/trivia/modes.py). Aparece solo en `/trivia start` |
+| **Cambiar puntos, etapas o tiempos** | Puntos y racha: arriba de [session.py](footballbot/services/trivia/session.py). Segundos por etapa: arriba de [cogs/trivia.py](footballbot/cogs/trivia.py). Intensidad del efecto: `levels` en [modes.py](footballbot/services/trivia/modes.py) |
+| **Actualizar los clubes (nueva temporada)** | `python scripts/build_dataset.py` y sube los JSON |
+| **Cambiar una tabla de la base de datos** | Una migración NUEVA en `storage/migrations/` (`002_...sql`); nunca edites `001_init.sql`. Las consultas van en [storage/repos.py](footballbot/storage/repos.py) |
 | **Un test** | `tests/`: copia uno parecido. Correr con `pytest` |
 
 ---
@@ -142,6 +192,10 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | **429** | Código HTTP de "demasiadas peticiones, espera" |
 | **async / await** | El bot atiende a muchos a la vez: `await` = "espera esto sin bloquear a los demás" |
 | **Fixture (tests)** | Datos guardados que usan los tests; o un objeto que pytest le pasa a cada test |
+| **View** | El grupo de botones debajo de un mensaje (`AnswerView` en la trivia) |
+| **Etapa (stage)** | Cada versión de la imagen en una ronda, de la más difícil (0) a la más fácil (3) |
+| **Migración** | Un archivo `.sql` numerado que cambia las tablas; se aplica solo una vez |
+| **Message Content intent** | Permiso especial de Discord para leer el texto de los mensajes. Hace falta para las respuestas escritas |
 
 ---
 
