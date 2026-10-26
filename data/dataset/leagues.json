@@ -1,0 +1,80 @@
+[
+  {
+    "code": "PL",
+    "name": "Premier League",
+    "area": "England",
+    "emblem_url": "https://crests.football-data.org/PL.png"
+  },
+  {
+    "code": "PD",
+    "name": "La Liga",
+    "area": "Spain",
+    "emblem_url": "https://crests.football-data.org/laliga.png"
+  },
+  {
+    "code": "SA",
+    "name": "Serie A",
+    "area": "Italy",
+    "emblem_url": "https://crests.football-data.org/c111.png"
+  },
+  {
+    "code": "BL1",
+    "name": "Bundesliga",
+    "area": "Germany",
+    "emblem_url": "https://crests.football-data.org/BL1.png"
+  },
+  {
+    "code": "FL1",
+    "name": "Ligue 1",
+    "area": "France",
+    "emblem_url": "https://crests.football-data.org/FL1.png"
+  },
+  {
+    "code": "DED",
+    "name": "Eredivisie",
+    "area": "Netherlands",
+    "emblem_url": "https://crests.football-data.org/ED.png"
+  },
+  {
+    "code": "PPL",
+    "name": "Primeira Liga",
+    "area": "Portugal",
+    "emblem_url": "https://crests.football-data.org/PPL.png"
+  },
+  {
+    "code": "ELC",
+    "name": "Championship",
+    "area": "England",
+    "emblem_url": "https://crests.football-data.org/ELC.png"
+  },
+  {
+    "code": "BSA",
+    "name": "Brasileirão Série A",
+    "area": "Brazil",
+    "emblem_url": "https://crests.football-data.org/bsa.png"
+  },
+  {
+    "code": "CL",
+    "name": "Champions League",
+    "area": "Europe",
+    "emblem_url": "https://crests.football-data.org/CL.png"
+  },
+  {
+    "code": "CLI",
+    "name": "Copa Libertadores",
+    "area": "South America",
+    "emblem_url": "https://crests.football-data.org/CLI.png"
+  },
+  {
+    "code": "WC",
+    "name": "FIFA World Cup",
+    "area": "World",
+    "emblem_url": "https://crests.football-data.org/wm26.png"
+  },
+  {
+    "code": "EC",
+    "name": "European Championship",
+    "area": "Europe",
+    "emblem_url": "https://crests.football-data.org/ec.png"
+  }
+]
