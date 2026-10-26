@@ -2,7 +2,7 @@
 
 Mark tasks with `[x]` when done and put the owner's name next to them: `- [ ] Task — @name`.
 
-**Current status:** Phase 0 and Phase 1 done. Next up: **Phase 2 — first trivia**.
+**Current status:** Phases 0, 1 and 2 done (end of the MVP). Next: everyone plays it on the server, then **Phase 3 — more image trivia**.
 
 ---
 
@@ -58,21 +58,29 @@ Notes from building it:
 
 ---
 
-## Phase 2 — First trivia (MVP)
+## Phase 2 — First trivia (MVP) ✅
 
-- [ ] `scripts/build_dataset.py`: teams from the main leagues with crest, country, league, founded, stadium
-- [ ] Initial `aliases.json` (nicknames for the ~100 best-known clubs)
-- [ ] `imaging/loader.py`: download, disk cache, SVG to PNG
-- [ ] `imaging/effects.py`: `pixelate`, `blur`
-- [ ] `GameSession` + round loop with reveal stages
-- [ ] **Button** answers (4 options)
-- [ ] **Typed** answers with `matching.py` (fuzzy + aliases)
-- [ ] Modes `crest`, `blur`, `league`
-- [ ] SQLite DB: `games`, `answers`, `scores`
-- [ ] Server `/leaderboard`
-- [ ] `/trivia stop`, one game per channel
+- [x] `scripts/build_dataset.py`: teams from the main leagues with crest, country, league, founded, stadium — @Juan-Miguel-alvarado
+- [x] Initial `aliases.json` (nicknames for the ~100 best-known clubs) — @Juan-Miguel-alvarado
+- [x] `imaging/loader.py`: download and disk cache (PNG crests, no SVG needed) — @Juan-Miguel-alvarado
+- [x] `imaging/effects.py`: `pixelate`, `blur` — @Juan-Miguel-alvarado
+- [x] `GameSession` + round loop with reveal stages — @Juan-Miguel-alvarado
+- [x] **Button** answers (4 options) — @Juan-Miguel-alvarado
+- [x] **Typed** answers with `matching.py` (fuzzy + aliases) — @Juan-Miguel-alvarado
+- [x] Modes `crest`, `blur`, `league` — @Juan-Miguel-alvarado
+- [x] SQLite DB: `games`, `answers`, `scores` — @Juan-Miguel-alvarado
+- [x] Server `/leaderboard` — @Juan-Miguel-alvarado
+- [x] `/trivia stop`, one game per channel — @Juan-Miguel-alvarado
+- [x] Turn on the *Message Content* intent for the bot — @Juan-Miguel-alvarado (each person also needs `TRIVIA_TYPED_ANSWERS=true` in their own `.env` to use typed answers)
+- [ ] Play a full game with several people on the server and report problems in `🐛-bug-reports`
+- [ ] Add more nicknames to `data/dataset/aliases.json` as people try typed answers
 
 **Done when:** several people can play a 10-round crest game and the leaderboard is saved.
+
+Notes from building it:
+- football-data.org crests are 200x200 PNGs, enough for 400 px trivia images, so there is no `cairosvg` (it needs system libraries that are painful on Windows).
+- Difficulty comes from the competitions a club plays: easy = top 5 leagues; medium adds Eredivisie, Primeira Liga, Brasileirão and Champions League clubs; hard adds the Championship and Copa Libertadores. National teams are left for the `flag` mode.
+- The bot no longer treats messages that mention it as old-style prefix commands (they used to fill the log with `CommandNotFound`).
 
 > **End of MVP.** Test it with friends on a real server before moving on.
 

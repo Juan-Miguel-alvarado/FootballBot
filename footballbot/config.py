@@ -28,8 +28,13 @@ class Settings(BaseSettings):
     # Canal donde el bot publica los errores inesperados con su traceback (opcional).
     discord_errors_channel_id: int | None = None
     football_data_key: SecretStr
-    thesportsdb_key: str = "123"  # todavía no se usa: llega en la Fase 2 (dataset de trivia)
-    database_url: str = "sqlite:///data/footballbot.db"  # todavía no se usa: Fase 2
+    thesportsdb_key: str = "123"  # todavía no se usa: llega en la Fase 3 (estadios, jugadores)
+    # Base de datos de la trivia (partidas y puntos). Por ahora solo SQLite: un archivo local.
+    database_url: str = "sqlite:///data/footballbot.db"
+    # Respuestas escritas en la trivia. Necesita el intent "Message Content" activado en el
+    # Developer Portal (Bot -> Privileged Gateway Intents); si está en true sin activarlo ahí,
+    # el bot no puede conectarse. Con false, la trivia solo usa botones.
+    trivia_typed_answers: bool = False
     # Zona horaria para "hoy" en /matches y para mostrar las horas de los partidos.
     timezone: str = "America/Bogota"
     log_level: str = "INFO"

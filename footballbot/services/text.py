@@ -14,5 +14,8 @@ _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
 def normalize(text: str) -> str:
     """Lowercase, strip accents and punctuation: 'Atlético  Madrid!' -> 'atletico madrid'."""
-    # unidecode: "Atlético" -> "Atletico", "Barça" -> "Barca". Luego todo lo raro -> un espacio.
-    return _NON_ALNUM.sub(" ", unidecode(text).lower()).strip()
+    # unidecode: "Atlético" -> "Atletico", "Barça" -> "Barca".
+    # Puntos y apóstrofos se quitan sin dejar espacio: "C.F." -> "cf", "M'gladbach" -> "mgladbach".
+    # Todo lo demás que no sea letra o número -> un espacio.
+    text = unidecode(text).lower().replace(".", "").replace("'", "")
+    return _NON_ALNUM.sub(" ", text).strip()

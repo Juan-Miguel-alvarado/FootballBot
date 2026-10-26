@@ -56,9 +56,9 @@ FootballBot/
 │   ├── cogs/
 │   │   ├── common.py          # autocomplete, argument parsing, embed helpers
 │   │   ├── info.py            # /matches /standings /team /player ...
-│   │   ├── trivia.py          # /trivia, /hint, answer buttons
+│   │   ├── trivia.py          # /trivia start|stop, /leaderboard, answer buttons, round loop
 │   │   ├── daily.py           # /daily
-│   │   ├── social.py          # /leaderboard /profile /achievements
+│   │   ├── social.py          # /profile /achievements (global /leaderboard later)
 │   │   ├── follow.py          # /follow + periodic alert task
 │   │   └── admin.py           # /config /ping /help
 │   ├── services/
@@ -66,10 +66,10 @@ FootballBot/
 │   │   ├── leagues.py         # supported competitions, codes, emoji, aliases
 │   │   ├── text.py            # normalize(): lowercase, no accents (search and matching)
 │   │   ├── trivia/
-│   │   │   ├── session.py     # GameSession: state of a game in a channel
-│   │   │   ├── modes.py       # one question generator per mode
+│   │   │   ├── dataset.py     # loads data/dataset/*.json into TriviaItems (+ aliases)
+│   │   │   ├── session.py     # GameSession: state, answers and points of a game
+│   │   │   ├── modes.py       # modes (crest, blur, league) + QuestionPicker
 │   │   │   └── matching.py    # normalization + fuzzy + aliases
-│   │   ├── scoring.py
 │   │   └── notifier.py
 │   ├── providers/
 │   │   ├── base.py            # FootballProvider protocol + provider errors
@@ -82,14 +82,14 @@ FootballBot/
 │   │   ├── effects.py         # pixelate, blur, silhouette, zoom_crop, grayscale
 │   │   ├── cards.py           # cards: standings, versus, profile, career path
 │   │   ├── fonts/             # freely licensed .ttf fonts
-│   │   └── loader.py          # download + disk cache + SVG to PNG
+│   │   └── loader.py          # download + disk cache
 │   ├── storage/
-│   │   ├── db.py
-│   │   ├── migrations/
-│   │   └── repos.py
-│   └── models/
+│   │   ├── db.py              # SQLite connection + migrations (PRAGMA user_version)
+│   │   ├── migrations/        # 001_init.sql, 002_..., never edit one already in main
+│   │   └── repos.py           # save_game(), leaderboard()
+│   └── models/                # football.py (Team, Match...) + trivia.py (TriviaItem...)
 ├── data/
-│   ├── dataset/               # teams.json, players.json, aliases.json (generated)
+│   ├── dataset/               # teams.json, leagues.json (generated, committed) + aliases.json (by hand)
 │   └── cache/                 # downloaded images (gitignored)
 ├── scripts/
 │   └── build_dataset.py       # builds the trivia dataset from the APIs
@@ -119,26 +119,27 @@ All sources are free. Details, limits and sign-up links are in [APIS.md](APIS.md
 
 ### Trivia dataset
 
-Generated file (`data/dataset/teams.json`), example record:
+Built by `python scripts/build_dataset.py` (run it again each season) and committed, so nobody else needs to run it. `data/dataset/teams.json`, one record per club:
 
 ```json
 {
-  "id": "fd-86",
+  "id": 86,
   "name": "Real Madrid CF",
-  "aliases": ["real madrid", "madrid", "los blancos", "rmcf"],
-  "country": "ES",
-  "league": "PD",
+  "short_name": "Real Madrid",
+  "tla": "RMA",
+  "country": "Spain",
+  "leagues": ["PD", "CL"],
   "founded": 1902,
-  "stadium": "Santiago Bernabeu",
-  "stadium_capacity": 83186,
-  "colors": ["#FFFFFF", "#00529F"],
-  "crest_url": "https://...",
-  "stadium_img_url": "https://...",
+  "venue": "Estadio Santiago Bernabéu",
+  "colors": "White / Purple",
+  "crest_url": "https://crests.football-data.org/86.png",
   "difficulty": 1
 }
 ```
 
-**Aliases** are maintained by hand in `aliases.json` and merged in when generating (this is the part that improves typed answers the most).
+`leagues.json` has the 13 competition logos for the `league` mode.
+
+**Aliases** are maintained by hand in `aliases.json` (`{"id": 86, "name": "Real Madrid", "aliases": ["madrid", "los blancos", ...]}`) and merged in **when the bot loads the dataset**, so adding a nickname needs no rebuild. `name` is the name shown in the game; clubs without an entry use the API's short name. This file is what improves typed answers the most.
 
 ---
 
@@ -151,7 +152,7 @@ Generated file (`data/dataset/teams.json`), example record:
 | Original images | disk, `data/cache/img/<hash>.png` | indefinite |
 | Processed images (pixelation stages) | memory, LRU | duration of the game |
 
-SVG crests are converted to PNG with `cairosvg` when downloaded.
+Trivia uses the PNG crests (200x200) from football-data.org; `scripts/build_dataset.py` checks that every crest has a PNG and swaps `.svg` URLs for `.png`. No `cairosvg`, so there is no system library to install.
 
 All football-data.org calls go through one `RateLimiter` (10 per minute, FIFO). On a 429 the provider waits for `X-RequestCounter-Reset` and retries once if that is under 20 s; otherwise the user gets a "try again in a minute" message.
 
@@ -190,19 +191,28 @@ Base effects (`imaging/effects.py`), all pure functions:
   - **Buttons**: `discord.ui.View` with 4 `Button`s; track who already answered.
   - **Typed**: `on_message` listener filtered to channels with an active session -> `matching.is_correct(text, answer)`.
 - `matching.py`: `unidecode` + lowercase + strip `fc`, `cf`, `club`, `de`... -> compare against name and aliases with `rapidfuzz.fuzz.ratio >= 85`.
-- Points = base x stage multiplier (faster means more points) + streak bonus. Saved to the DB when the game ends.
+- Points by stage: 100 / 75 / 50 / 25, plus +10 for each round won in a row (up to +50). Saved to the DB when the game ends.
+- The first correct answer wins the round. Buttons: a wrong click locks that player out of the round. Typed: wrong guesses are free.
+- Typed answers need the privileged *Message Content* intent, so they are behind `TRIVIA_TYPED_ANSWERS` (off by default).
 - If the bot restarts mid-game, the game is lost (acceptable). Scores are what persists.
 
 ---
 
-## Database (draft)
+## Database
+
+Built in Phase 2 (`storage/migrations/001_init.sql`):
+
+```
+games         (id, guild_id, channel_id, mode, difficulty, rounds, started_at, ended_at)
+answers       (game_id, user_id, round, correct, stage, points, answered_at)
+scores        (guild_id, user_id, mode, points, correct, answered, played, best_streak)   -- aggregate
+```
+
+Planned:
 
 ```
 guilds        (id, trivia_channel_id, default_leagues, answer_mode, lang)
 users         (id, created_at)
-games         (id, guild_id, channel_id, mode, difficulty, started_at, ended_at)
-answers       (game_id, user_id, round, correct, stage, points, answered_at)
-scores        (guild_id, user_id, mode, points, correct, played, best_streak)   -- aggregate
 follows       (guild_id, channel_id, team_id)
 daily         (date, mode, answer_id)
 daily_results (date, user_id, attempts, solved)
@@ -210,7 +220,7 @@ achievements  (user_id, code, unlocked_at)
 -- later: predictions, cards, user_cards
 ```
 
-Simple migrations with numbered SQL files (`migrations/001_init.sql`). If we move to Postgres, use `asyncpg` behind the same `repos.py` interface.
+Simple migrations with numbered SQL files (`migrations/001_init.sql`); SQLite's `PRAGMA user_version` stores the last one applied and the bot applies the missing ones at startup. If we move to Postgres, use `asyncpg` behind the same `repos.py` interface.
 
 ---
 
@@ -255,7 +265,7 @@ The core is Python. JS/TS only comes in where it adds value:
 
 ## Deployment
 
-- `Dockerfile` (python-slim + libcairo for SVG).
+- `Dockerfile` (python-slim; Pillow wheels need no system libraries).
 - Options: a cheap VPS, Railway/Fly.io, or a Raspberry Pi at home. It must run 24/7 for `/follow` and `/daily`.
 - Standard `logging` to stdout; command errors are reported to a private channel on the dev server.
 
