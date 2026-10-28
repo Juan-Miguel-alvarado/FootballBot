@@ -157,6 +157,7 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | **Un comando nuevo** | Copia `leagues` (simple) o `standings` (con API) en [cogs/info.py](footballbot/cogs/info.py). Si necesita datos, añade un método en [services/football.py](footballbot/services/football.py). Anótalo en [COMMANDS.md](COMMANDS.md) |
 | **Un archivo de comandos nuevo** (ej. `trivia.py`) | Créalo en `cogs/` con una función `setup(bot)` al final (copia la de [admin.py](footballbot/cogs/admin.py)) y añádelo a `EXTENSIONS` en [bot.py](footballbot/bot.py) |
 | **Cambiar cómo se ve un comando** | Las funciones `_match_line`, `_table_block`, `_team_embed` al final de [cogs/info.py](footballbot/cogs/info.py) |
+| **Las zonas o el color de una liga en `/standings`** (puestos de Champions, descenso...) | `ZONES` y `COLORS` en [services/leagues.py](footballbot/services/leagues.py) |
 | **Añadir una liga o un apodo** | `LEAGUES` en [services/leagues.py](footballbot/services/leagues.py) |
 | **Un endpoint nuevo de football-data** | Un método en [providers/football_data.py](footballbot/providers/football_data.py) (copia `team()`), y si es nuevo en el Protocol, en [providers/base.py](footballbot/providers/base.py) |
 | **Otra API** (TheSportsDB...) | Un archivo nuevo en `providers/` que devuelva los modelos de [models/football.py](footballbot/models/football.py) |

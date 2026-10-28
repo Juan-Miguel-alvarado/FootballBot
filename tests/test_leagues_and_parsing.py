@@ -11,7 +11,7 @@ import pytest
 
 from footballbot.cogs.common import image_url, pack_fields, parse_day, parse_league, split_lines
 from footballbot.errors import UserFacingError
-from footballbot.services.leagues import find_league, search_leagues
+from footballbot.services.leagues import find_league, search_leagues, zone_for
 from footballbot.services.text import normalize
 
 
@@ -85,3 +85,42 @@ def test_pack_fields_spreads_over_embeds() -> None:
     assert len(embeds) == 3
     assert embeds[0] is base
     assert sum(len(e.fields) for e in embeds) == 12
+
+
+# --- zonas de /standings -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("code", "position", "size", "label"),
+    [
+        ("PL", 1, 20, "Champions League"),
+        ("PL", 5, 20, "Europa League"),
+        ("PL", 10, 20, None),  # mitad de tabla
+        ("PL", 18, 20, "Relegation"),  # -3 en una liga de 20
+        ("BL1", 16, 18, "Relegation playoff"),  # -3 en una liga de 18
+        ("BL1", 18, 18, "Relegation"),
+        ("CL", 24, 36, "Knockout playoffs"),
+        ("XYZ", 1, 20, None),  # liga sin zonas
+    ],
+)
+def test_zone_for(code: str, position: int, size: int, label: str | None) -> None:
+    zone = zone_for(code, position, size)
+    assert (zone.label if zone else None) == label
+
+
+def test_standings_table_has_zone_emojis_and_legend() -> None:
+    from footballbot.cogs.info import _leader_line, _table_block, _zone_legend
+    from footballbot.models import Competition, Standing
+    from footballbot.providers.football_data import _standing_row
+    from tests.conftest import load_fixture
+
+    data = load_fixture("football_data/standings_PL.json")
+    rows = tuple(_standing_row(r) for r in data["standings"][0]["table"])
+    table = Standing(Competition("PL", "Premier League", "England"), rows)
+
+    lines = _table_block(table, "PL").splitlines()
+    assert lines[0] == "```" and lines[-1] == "```"
+    assert lines[2].startswith("🔵  1 Man City")
+    assert lines[-2].startswith("🔴 20 ")
+    assert _zone_legend("PL", [table]).startswith("🔵 Champions League")
+    assert _leader_line(table).startswith("👑 **Man City** · 21 pts")
