@@ -37,7 +37,7 @@ from footballbot.errors import UserFacingError
 from footballbot.models import Match, MatchStatus, Standing
 from footballbot.providers.base import NotFoundError
 from footballbot.services.football import MatchGroup, TeamProfile
-from footballbot.services.leagues import LEAGUES, get_league
+from footballbot.services.leagues import COLORS, LEAGUES, NONE, get_league, zone_for
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +55,8 @@ _STATUS_LABELS = {
 }
 # Racha de /team: ganó, empató, perdió.
 _FORM_EMOJI = {"W": "🟩", "D": "🟨", "L": "🟥"}
+# /standings: emoji de la fila de títulos de la tabla
+HEADER_EMOJI = "⚽"
 
 
 class Info(commands.Cog):
@@ -146,16 +148,22 @@ class Info(commands.Cog):
             )
 
         competition = tables[0].competition
-        embed = discord.Embed(title=f"{chosen.emoji} {chosen.name} · standings", color=COLOR)
+        # Cada liga con el color de su marca en la barra lateral del embed
+        color = discord.Color(COLORS.get(chosen.code, COLOR.value))
+        embed = discord.Embed(title=f"{chosen.emoji} {chosen.name} · Standings", color=color)
         if thumbnail := image_url(competition.emblem):
             embed.set_thumbnail(url=thumbnail)
+        legend = _zone_legend(chosen.code, tables)
         if len(tables) == 1:
-            # Liga normal: una sola tabla en la descripción del embed.
-            embed.description = _table_block(tables[0])
+            # Liga normal: quién va primero, la tabla y la leyenda de colores, en la descripción.
+            parts = [_leader_line(tables[0]), _table_block(tables[0], chosen.code), legend]
+            embed.description = "\n".join(p for p in parts if p)
             embeds = [embed]
         else:
-            # Torneo con grupos: un campo por grupo.
-            fields = [(_group_name(t.group), _table_block(t)) for t in tables]
+            # Torneo con grupos: un campo por grupo y la leyenda al final.
+            fields = [(_group_name(t.group), _table_block(t, chosen.code)) for t in tables]
+            if legend:
+                fields.append(("Zones", legend))
             embeds = pack_fields(embed, fields)
         if tables[0].matchday:
             embeds[-1].set_footer(text=f"Matchday {tables[0].matchday}")
@@ -220,20 +228,55 @@ def _match_fields(groups: list[MatchGroup], tz: ZoneInfo, *, single: bool) -> li
     return fields
 
 
-def _table_block(table: Standing) -> str:
+def _table_block(table: Standing, code: str) -> str:
     """La tabla como bloque de código, para que las columnas queden alineadas.
 
-    Los números como `:>2` significan "alinear a la derecha en 2 caracteres".
-    Cabe en unos 38 caracteres de ancho para que se vea bien en el celular.
+    Cada fila empieza con el círculo de color de su zona (🔵 Champions, 🔴 descenso...; ver
+    ZONES en services/leagues.py). Todas las filas empiezan con un emoji para que las columnas
+    sigan alineadas. Los números como `:>2` significan "alinear a la derecha en 2 caracteres".
+    Cabe en unos 40 caracteres de ancho para que se vea bien en el celular.
     """
-    header = f"{'#':>2} {'Team':<14} {'P':>2} {'W':>2} {'D':>2} {'L':>2} {'GD':>3} {'Pts':>3}"
-    rows = [
-        f"{r.position:>2} {r.team.short_name[:14]:<14} {r.played:>2} {r.won:>2} {r.draw:>2} "
+    size = len(table.rows)
+    header = (
+        f"{HEADER_EMOJI} {'#':>2} {'Team':<14} {'P':>2} {'W':>2} {'D':>2} {'L':>2} "
+        f"{'GD':>3} {'Pts':>3}"
+    )
+    rows = []
+    for r in table.rows:
+        zone = zone_for(code, r.position, size)
         # Diferencia de goles con signo (+7, -3), pero "0" en vez de "+0".
-        f"{r.lost:>2} {f'{r.goal_difference:+d}' if r.goal_difference else '0':>3} {r.points:>3}"
-        for r in table.rows
-    ]
+        gd = f"{r.goal_difference:+d}" if r.goal_difference else "0"
+        rows.append(
+            f"{zone.emoji if zone else NONE} {r.position:>2} {r.team.short_name[:14]:<14} "
+            f"{r.played:>2} {r.won:>2} {r.draw:>2} {r.lost:>2} {gd:>3} {r.points:>3}"
+        )
     return "```\n" + "\n".join([header, *rows]) + "\n```"
+
+
+def _leader_line(table: Standing) -> str:
+    """ "👑 **Man City** lead on goal difference over Arsenal" o "... lead by 3 points"."""
+    if not table.rows:
+        return ""
+    first = table.rows[0]
+    line = f"👑 **{first.team.short_name}** · {first.points} pts"
+    if len(table.rows) > 1:
+        second = table.rows[1]
+        gap = first.points - second.points
+        if gap:
+            line += f", {gap} {'point' if gap == 1 else 'points'} clear of {second.team.short_name}"
+        else:
+            line += f", level on points with {second.team.short_name}"
+    return line
+
+
+def _zone_legend(code: str, tables: list[Standing]) -> str:
+    """ "🔵 Champions League · 🟠 Europa League · 🔴 Relegation": solo las zonas que aparecen."""
+    seen: dict[str, str] = {}
+    for table in tables:
+        for r in table.rows:
+            if zone := zone_for(code, r.position, len(table.rows)):
+                seen.setdefault(zone.label, zone.emoji)
+    return " · ".join(f"{emoji} {label}" for label, emoji in seen.items())
 
 
 def _group_name(group: str | None) -> str:
