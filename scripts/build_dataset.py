@@ -25,14 +25,11 @@ import httpx
 from footballbot.config import Settings
 from footballbot.models import Team
 from footballbot.providers.football_data import FootballDataProvider
-from footballbot.services.leagues import LEAGUES, TOP_5
+from footballbot.services.leagues import LEAGUES, NATIONAL_TEAMS, TOP_5
 
 log = logging.getLogger("build_dataset")
 
 DATASET_DIR = Path(__file__).resolve().parent.parent / "data" / "dataset"
-
-# Selecciones nacionales: quedan para el modo `flag` (Fase 3)
-NATIONAL_TEAM_COMPETITIONS = {"WC", "EC"}
 
 # Dificultad de un equipo según la competición: 1 fácil, 2 media, 3 difícil.
 # Si juega varias (liga + Champions), se queda con la más fácil.
@@ -93,7 +90,8 @@ async def _download(provider: FootballDataProvider) -> tuple[list[dict], list[di
     """Equipos (sin repetir) de todas las competiciones de clubes, y los logos de las ligas."""
     teams: dict[int, dict] = {}
     for league in LEAGUES:
-        if league.code in NATIONAL_TEAM_COMPETITIONS:
+        # Selecciones nacionales: quedan para el modo `flag` (Fase 3)
+        if league.code in NATIONAL_TEAMS:
             continue
         log.info("Downloading %s teams...", league.code)
         for team in await provider.competition_teams(league.code):

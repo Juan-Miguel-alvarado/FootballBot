@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 from footballbot.errors import UserFacingError
 from footballbot.models import Competition, Match, Standing, Team
 from footballbot.providers.base import FootballProvider, ProviderError, ProviderHealth
-from footballbot.services.leagues import LEAGUES, league_order
+from footballbot.services.leagues import CLUB_COMPETITIONS, league_order
 from footballbot.services.text import normalize
 
 log = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ class FootballService:
 
     async def refresh_team_index(
         self,
-        leagues: Sequence[str] = tuple(league.code for league in LEAGUES),
+        leagues: Sequence[str] = CLUB_COMPETITIONS,
         delay: float = INDEX_REQUEST_DELAY,
     ) -> None:
         """Loads every team of `leagues` into memory for autocomplete. Slow on purpose.
@@ -159,7 +159,8 @@ class FootballService:
         ¿Por qué un índice en memoria? Discord exige responder el autocompletado en menos
         de 3 s, y no podemos gastar una petición a la API por cada letra que escribe alguien.
         Lo llama la tarea `refresh_teams` de cogs/info.py al arrancar y cada 24 h.
-        Tarda unos 3 minutos (13 ligas x 12 s); mientras tanto pueden faltar sugerencias.
+        Tarda unos 2 minutos (11 ligas x 12 s); mientras tanto pueden faltar sugerencias.
+        Solo clubes: las selecciones (Mundial, Euro) no están en el plan gratis de la API.
         """
         for i, code in enumerate(leagues):
             if i:

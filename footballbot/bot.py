@@ -25,7 +25,12 @@ from discord.ext import commands
 from footballbot.config import Settings
 from footballbot.errors import UserFacingError
 from footballbot.imaging.loader import ImageLoader
-from footballbot.providers.base import NotFoundError, ProviderError, RateLimitedError
+from footballbot.providers.base import (
+    NotFoundError,
+    NotInPlanError,
+    ProviderError,
+    RateLimitedError,
+)
 from footballbot.providers.football_data import FootballDataProvider
 from footballbot.services.football import FootballService
 from footballbot.storage.db import Database
@@ -121,6 +126,12 @@ class FootballBot(commands.Bot):
             case UserFacingError():
                 # El usuario se equivocó (fecha mal escrita...): se le muestra el mensaje tal cual.
                 message = str(original)
+            case NotInPlanError():
+                # Va antes que NotFoundError porque es un caso particular de él
+                message = (
+                    "That isn't included in the free football data plan we use "
+                    "(national teams, for example). Try a club instead."
+                )
             case NotFoundError():
                 message = "I couldn't find that. Check the name or pick one from the suggestions."
             case RateLimitedError():
