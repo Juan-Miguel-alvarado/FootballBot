@@ -114,6 +114,7 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | Error | Ejemplo | El usuario ve | ¿Va al canal de errores? |
 |---|---|---|---|
 | `UserFacingError` | escribió `/matches date:mañana` | el mensaje exacto ("is not a date...") | No |
+| `NotInPlanError` | una selección: la API gratis responde 403 | "That isn't included in the free football data plan..." | No |
 | `NotFoundError` | equipo que no existe | "I couldn't find that..." | No |
 | `RateLimitedError` | se gastaron las 10 peticiones del minuto | "The football API is busy..." | No |
 | `ProviderError` | la API está caída | "The football data service is not responding..." | No (queda en el log) |
@@ -145,7 +146,7 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 1. `python -m footballbot` → [`__main__.py`](footballbot/__main__.py) lee el `.env` con `Settings` ([config.py](footballbot/config.py)). Si falta algo, dice qué variable.
 2. Crea `FootballBot` ([bot.py](footballbot/bot.py)), que crea el provider, el `FootballService`, la base de datos (`bot.db`) y el descargador de imágenes (`bot.images`). Uno solo de cada uno para todo el bot.
 3. `setup_hook` abre la base de datos (crea `data/footballbot.db` y aplica las migraciones que falten), carga los cogs de `EXTENSIONS` y sincroniza los comandos con el servidor de pruebas (`DISCORD_DEV_GUILD_ID`): así aparecen al escribir `/`. Al cargar [cogs/trivia.py](footballbot/cogs/trivia.py) se lee el dataset.
-4. Al cargar [cogs/info.py](footballbot/cogs/info.py) arranca la tarea `refresh_teams`: va llenando el índice de equipos para el autocompletado de `/team`, una liga cada 12 s (~3 min en total) para no gastar toda la cuota. Se repite cada 24 h.
+4. Al cargar [cogs/info.py](footballbot/cogs/info.py) arranca la tarea `refresh_teams`: va llenando el índice de equipos para el autocompletado de `/team`, una liga cada 12 s (~2 min en total) para no gastar toda la cuota. Solo clubes: las selecciones no están en el plan gratis de la API. Se repite cada 24 h.
 5. `on_ready`: el log dice `Logged in as FootballTrivia#...`.
 
 ---

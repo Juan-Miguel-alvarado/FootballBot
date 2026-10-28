@@ -191,3 +191,18 @@ def test_result_for() -> None:
     assert m.result_for(CHELSEA.id) == "L"
     assert m.result_for(REAL.id) is None
     assert match(2, PL, datetime.now(UTC)).result_for(ARSENAL.id) is None
+
+
+async def test_team_index_skips_national_teams(
+    service: FootballService, provider: FakeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    requested: list[str] = []
+
+    async def competition_teams(code: str) -> list[Team]:
+        requested.append(code)
+        return []
+
+    monkeypatch.setattr(provider, "competition_teams", competition_teams)
+    await service.refresh_team_index(delay=0)
+    assert "PL" in requested
+    assert "WC" not in requested and "EC" not in requested

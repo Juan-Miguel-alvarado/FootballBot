@@ -156,7 +156,7 @@ Trivia uses the PNG crests (200x200) from football-data.org; `scripts/build_data
 
 All football-data.org calls go through one `RateLimiter` (10 per minute, FIFO). On a 429 the provider waits for `X-RequestCounter-Reset` and retries once if that is under 20 s; otherwise the user gets a "try again in a minute" message.
 
-**Autocomplete never calls an API**: Discord expects an answer in under 3 s, so team suggestions come from an in-memory index of every team in the 13 competitions. It is built at startup with one request every 12 s (about 3 minutes) to leave quota for commands.
+**Autocomplete never calls an API**: Discord expects an answer in under 3 s, so team suggestions come from an in-memory index of every club in the 11 club competitions. National teams (World Cup, Euro) are left out because the free plan answers 403 for them. It is built at startup with one request every 12 s (about 2 minutes) to leave quota for commands.
 
 ---
 
@@ -276,6 +276,7 @@ The core is Python. JS/TS only comes in where it adds value:
 | Error | User sees | Reported to `#errors` |
 |---|---|---|
 | `UserFacingError` | its message (bad date, unknown league or team...) | No |
+| `NotInPlanError` (API 403, e.g. a national team) | "isn't included in the free football data plan" | No |
 | `NotFoundError` / `RateLimitedError` / `ProviderError` | "couldn't find that" / "API busy" / "service not responding" | No (logged) |
 | Anything else | "Something went wrong" | Yes, with traceback |
 

@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from footballbot.providers import football_data
-from footballbot.providers.base import NotFoundError, RateLimitedError
+from footballbot.providers.base import NotFoundError, NotInPlanError, RateLimitedError
 from footballbot.providers.football_data import FootballDataProvider
 from tests.conftest import load_fixture
 
@@ -172,3 +172,10 @@ async def test_records_quota_left(provider: FootballDataProvider, api: FakeApi) 
     )
     await provider.competitions()
     assert provider.health().requests_left == 7
+
+
+async def test_forbidden_means_not_in_plan(provider: FootballDataProvider, api: FakeApi) -> None:
+    # Las selecciones (ej. /teams/762) responden 403 en el plan gratis
+    api.responses.append(httpx.Response(403, json={"message": "restricted"}))
+    with pytest.raises(NotInPlanError):
+        await provider.team(762)

@@ -30,6 +30,7 @@ from cachetools import TTLCache
 from footballbot.models import Competition, Match, Player, Standing, StandingRow, Team
 from footballbot.providers.base import (
     NotFoundError,
+    NotInPlanError,
     ProviderError,
     ProviderHealth,
     RateLimitedError,
@@ -185,7 +186,8 @@ class FootballDataProvider:
         if response.status_code == 404:
             raise NotFoundError(f"{path} not found")
         if response.status_code == 403:
-            raise NotFoundError(f"{path} is not included in the free plan")
+            # Ej.: /teams/{id} de una selección. Existe, pero no está en el plan gratis.
+            raise NotInPlanError(f"{path} is not included in the free plan")
         if response.is_error:
             raise ProviderError(f"football-data returned {response.status_code} for {path}")
 

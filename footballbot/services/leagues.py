@@ -46,6 +46,12 @@ LEAGUES: tuple[League, ...] = (
 
 TOP_5 = ("PL", "PD", "SA", "BL1", "FL1")
 
+# Torneos de selecciones. El plan gratis de football-data.org NO deja consultar selecciones
+# (/teams/{id} responde 403), así que no se usan ni en el autocompletado de /team ni en la
+# trivia de clubes. Quedan para el modo `flag` (Fase 3).
+NATIONAL_TEAMS = ("WC", "EC")
+CLUB_COMPETITIONS = tuple(lg.code for lg in LEAGUES if lg.code not in NATIONAL_TEAMS)
+
 
 # --- zonas de la tabla (/standings) ------------------------------------------------------------
 

@@ -28,6 +28,10 @@ class NotFoundError(ProviderError):
     """
 
 
+class NotInPlanError(NotFoundError):
+    """Existe, pero el plan gratis de la API no lo incluye (403). Ej.: las selecciones."""
+
+
 class RateLimitedError(ProviderError):
     """Gastamos las peticiones permitidas por minuto y hay que esperar `retry_after` segundos."""
 
