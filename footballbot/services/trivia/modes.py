@@ -9,8 +9,10 @@ Para añadir un modo nuevo (ej. `silhouette` en la Fase 3):
 """
 
 import random
-from collections.abc import Sequence
+from collections import Counter, deque
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from footballbot.models import Question, TriviaItem
 from footballbot.services.trivia.dataset import TriviaDataset
@@ -74,15 +76,35 @@ def pool_for(mode: Mode, dataset: TriviaDataset, difficulty: str) -> list[Trivia
 
 
 class QuestionPicker:
-    """Va sacando preguntas sin repetir la respuesta dentro de una misma partida."""
+    """Va sacando preguntas sin repetir la respuesta.
 
-    def __init__(self, pool: Sequence[TriviaItem], rng: random.Random | None = None) -> None:
+    Dentro de una partida nunca se repite una respuesta. Entre partidas, con `last_seen` (qué salió
+    ya en este servidor y cuándo; viene de la base de datos, ver storage/repos.py):
+    1. primero salen, en orden aleatorio, las respuestas que nunca salieron;
+    2. cuando ya salieron todas, primero las que hace más tiempo que no salen.
+    Es una "bolsa barajada con memoria": no se repite un escudo hasta agotar todos.
+    """
+
+    def __init__(
+        self,
+        pool: Sequence[TriviaItem],
+        rng: random.Random | None = None,
+        last_seen: Mapping[str, datetime] | None = None,
+    ) -> None:
         if len(pool) < OPTIONS_PER_QUESTION:
             raise ValueError(f"need at least {OPTIONS_PER_QUESTION} items, got {len(pool)}")
         self._pool = list(pool)
         self._rng = rng or random.Random()
-        # Orden aleatorio de las respuestas; se van sacando de a una
-        self._upcoming = self._rng.sample(self._pool, len(self._pool))
+        last_seen = last_seen or {}
+
+        shuffled = self._rng.sample(self._pool, len(self._pool))
+        never_seen = [item for item in shuffled if item.id not in last_seen]
+        seen = [item for item in shuffled if item.id in last_seen]
+        # sort() mantiene el orden aleatorio entre los que salieron a la vez (misma partida)
+        seen.sort(key=lambda item: last_seen[item.id])
+        self._upcoming = deque(never_seen + seen)
+        # Cuántas veces salió cada club como opción falsa en esta partida (para variar)
+        self._option_uses: Counter[str] = Counter()
 
     @property
     def remaining(self) -> int:
@@ -91,15 +113,21 @@ class QuestionPicker:
     def next(self) -> Question:
         if not self._upcoming:
             raise IndexError("no more questions in this pool")
-        answer = self._upcoming.pop()
+        answer = self._upcoming.popleft()
         options = [answer, *self._distractors(answer)]
         self._rng.shuffle(options)
         return Question(answer=answer, options=tuple(options))
 
     def _distractors(self, answer: TriviaItem) -> list[TriviaItem]:
-        """3 opciones falsas con nombres distintos entre sí y a la respuesta."""
+        """3 opciones falsas con nombres distintos entre sí y a la respuesta.
+
+        Prefiere las que menos han salido como opción en esta partida, para que no se vean
+        siempre los mismos clubes en los botones.
+        """
         candidates = [item for item in self._pool if item.id != answer.id]
         self._rng.shuffle(candidates)
+        # Menos usadas primero; entre las igual de usadas queda el orden aleatorio
+        candidates.sort(key=lambda item: self._option_uses[item.id])
         # Primero hasta 2 del mismo país, luego cualquiera
         same_country = [c for c in candidates if c.country == answer.country]
         first = same_country[:SAME_COUNTRY_DISTRACTORS]
@@ -114,4 +142,5 @@ class QuestionPicker:
             names.add(item.name)
             if len(chosen) == OPTIONS_PER_QUESTION - 1:
                 break
+        self._option_uses.update(item.id for item in chosen)
         return chosen
