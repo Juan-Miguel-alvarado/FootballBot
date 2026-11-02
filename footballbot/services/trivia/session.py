@@ -67,6 +67,8 @@ class GameSession:
         self.scores: dict[int, PlayerScore] = {}
         self.answers: list[AnswerRecord] = []
         self._tried: set[int] = set()  # quién ya respondió (mal) con botones esta ronda
+        # ids de las respuestas de cada ronda jugada (se guardan para no repetirlas, issue #9)
+        self.played: list[str] = []
         # cogs/trivia.py espera este evento: se activa cuando alguien acierta o se para el juego
         self.round_over = asyncio.Event()
 
@@ -84,6 +86,7 @@ class GameSession:
         self.round += 1
         self.stage = 0
         self.question = question
+        self.played.append(question.answer.id)
         self.winner = None
         self.round_open = True
         self._tried.clear()

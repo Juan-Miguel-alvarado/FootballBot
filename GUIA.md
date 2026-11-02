@@ -66,8 +66,8 @@ footballbot/
 │
 ├── storage/                 ── BASE DE DATOS (SQLite) ──
 │   ├── db.py                Conexión y migraciones
-│   ├── migrations/          001_init.sql: tablas games, answers, scores
-│   └── repos.py             save_game(), leaderboard()
+│   ├── migrations/          001_init.sql: games, answers, scores · 002: trivia_seen (no repetir)
+│   └── repos.py             save_game(), leaderboard(), last_seen(), mark_seen()
 │
 ├── providers/               ── APIs EXTERNAS ──
 │   ├── football_data.py     Cliente de football-data.org: caché + HTTP + JSON → models

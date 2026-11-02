@@ -5,7 +5,7 @@ Las imágenes se generan en memoria con Pillow, y la base de datos es un archivo
 """
 
 import io
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -16,7 +16,7 @@ from footballbot.imaging.effects import SIZE, blur, pixelate, prepare, render_st
 from footballbot.imaging.loader import ImageDownloadError, ImageLoader
 from footballbot.models import AnswerRecord, GameResult, PlayerScore
 from footballbot.storage import repos
-from footballbot.storage.db import Database, sqlite_path
+from footballbot.storage.db import MIGRATIONS_DIR, Database, sqlite_path
 
 
 def crest_png() -> bytes:
@@ -123,8 +123,10 @@ def game(guild_id: int, mode: str, players: list[PlayerScore]) -> GameResult:
 
 
 async def test_migrations_create_tables(db: Database) -> None:
+    # user_version = número de la última migración aplicada
+    latest = max(int(f.name.split("_")[0]) for f in MIGRATIONS_DIR.glob("*.sql"))
     async with db.conn.execute("PRAGMA user_version") as cursor:
-        assert (await cursor.fetchone())[0] == 1
+        assert (await cursor.fetchone())[0] == latest >= 2
     # Volver a migrar no hace nada (no falla por tablas que ya existen)
     await db.migrate()
 
@@ -168,3 +170,33 @@ async def test_loader_downloads_once_when_asked_twice_at_the_same_time(tmp_path:
     await loader.aclose()
     assert a == b == b"png"
     assert len(calls) == 1
+
+
+async def test_last_seen_and_mark_seen(db: Database) -> None:
+    yesterday = datetime.now(UTC) - timedelta(days=1)
+    await repos.mark_seen(db, 1, ["team-86", "team-81"], when=yesterday)
+    await repos.mark_seen(db, 1, ["team-86"])  # vuelve a salir: se actualiza la fecha
+    await repos.mark_seen(db, 2, ["team-5"])  # otro servidor
+
+    seen = await repos.last_seen(db, 1)
+    assert seen.keys() == {"team-86", "team-81"}
+    assert seen["team-81"] == yesterday
+    assert seen["team-86"] > yesterday
+    assert await repos.last_seen(db, 3) == {}
+
+
+async def test_migration_002_upgrades_an_existing_database(tmp_path: Path) -> None:
+    """Una base creada solo con la 001 (como la de quien ya jugó) recibe la 002 al arrancar."""
+    import aiosqlite
+
+    path = tmp_path / "old.db"
+    async with aiosqlite.connect(path) as conn:
+        await conn.executescript((MIGRATIONS_DIR / "001_init.sql").read_text())
+        await conn.execute("PRAGMA user_version = 1")
+        await conn.commit()
+
+    database = Database(f"sqlite:///{path}")
+    await database.connect()
+    await repos.mark_seen(database, 1, ["team-86"])
+    assert "team-86" in await repos.last_seen(database, 1)
+    await database.close()

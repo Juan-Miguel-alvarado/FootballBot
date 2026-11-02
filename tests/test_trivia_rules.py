@@ -3,6 +3,8 @@
 """
 
 import random
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -216,3 +218,52 @@ def test_result_for_the_database() -> None:
     assert result.mode == "crest"
     assert [p.user_id for p in result.players] == [200, 100]
     assert len(result.answers) == 2
+
+
+# --- sin repetir entre partidas (issue #9) -----------------------------------------------------
+
+
+def play_games(pool: list[TriviaItem], games: int, rounds: int, seed: int) -> list[list[str]]:
+    """Simula partidas seguidas en un servidor, recordando lo que salió como hace el bot."""
+    rng = random.Random(seed)
+    seen: dict[str, datetime] = {}
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    played = []
+    for game in range(games):
+        picker = QuestionPicker(pool, rng, last_seen=seen)
+        answers = [picker.next().answer.id for _ in range(rounds)]
+        played.append(answers)
+        for item_id in answers:  # lo que hace repos.mark_seen al terminar
+            seen[item_id] = now + timedelta(minutes=game)
+    return played
+
+
+def test_no_repeats_across_games_until_the_pool_runs_out() -> None:
+    pool = [item(i) for i in range(96)]
+    games = play_games(pool, games=9, rounds=10, seed=5)  # 90 rondas de 96 posibles
+    flat = [a for game in games for a in game]
+    assert len(flat) == len(set(flat))
+
+
+def test_after_the_pool_runs_out_the_oldest_come_first() -> None:
+    pool = [item(i) for i in range(20)]
+    games = play_games(pool, games=3, rounds=10, seed=6)
+    # Partidas 1 y 2 agotan las 20; la 3 repite las de la partida 1 (las más viejas)
+    assert set(games[2]) == set(games[0])
+    assert not set(games[2]) & set(games[1])
+
+
+def test_old_behaviour_without_memory_still_works() -> None:
+    picker = QuestionPicker([item(i) for i in range(8)], random.Random(7))
+    assert len({picker.next().answer.id for _ in range(8)}) == 8
+
+
+def test_wrong_options_vary_within_a_game() -> None:
+    pool = [item(i) for i in range(40)]
+    picker = QuestionPicker(pool, random.Random(8))
+    uses: Counter[str] = Counter()
+    for _ in range(10):
+        q = picker.next()
+        uses.update(o.id for o in q.options if o.id != q.answer.id)
+    # 30 opciones falsas repartidas entre 39 clubes: ninguno debería salir más de 2 veces
+    assert max(uses.values()) <= 2

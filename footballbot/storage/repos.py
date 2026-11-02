@@ -7,7 +7,9 @@ Para añadir una consulta: escribe una función async que reciba `db: Database`,
 y devuelva modelos o dataclasses, no filas crudas.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from footballbot.models import GameResult
 from footballbot.storage.db import Database
@@ -108,3 +110,27 @@ async def leaderboard(
         )
         for row in rows
     ]
+
+
+async def last_seen(db: Database, guild_id: int) -> dict[str, datetime]:
+    """Qué respuestas de la trivia ya salieron en este servidor y cuándo (id -> fecha)."""
+    async with db.conn.execute(
+        "SELECT item_id, last_seen_at FROM trivia_seen WHERE guild_id = ?", (guild_id,)
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return {row["item_id"]: datetime.fromisoformat(row["last_seen_at"]) for row in rows}
+
+
+async def mark_seen(
+    db: Database, guild_id: int, item_ids: Iterable[str], when: datetime | None = None
+) -> None:
+    """Anota que estas respuestas salieron ahora (o en `when`); si ya estaban, cambia la fecha."""
+    seen_at = (when or datetime.now(UTC)).isoformat()
+    await db.conn.executemany(
+        """
+        INSERT INTO trivia_seen (guild_id, item_id, last_seen_at) VALUES (?, ?, ?)
+        ON CONFLICT (guild_id, item_id) DO UPDATE SET last_seen_at = excluded.last_seen_at
+        """,
+        [(guild_id, item_id, seen_at) for item_id in item_ids],
+    )
+    await db.conn.commit()
