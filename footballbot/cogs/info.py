@@ -26,6 +26,8 @@ from discord.ext import commands, tasks
 from footballbot.bot import FootballBot
 from footballbot.cogs.common import (
     COLOR,
+    MAX_EMBED_CHARS,
+    MAX_EMBEDS_PER_MESSAGE,
     date_autocomplete,
     image_url,
     league_autocomplete,
@@ -67,6 +69,8 @@ _STATUS_LABELS = {
     MatchStatus.CANCELLED: "CAN",
 }
 # Racha de /team: ganó, empató, perdió.
+# Máximo de caracteres de la descripción de un embed
+MAX_DESCRIPTION = 4096
 _FORM_EMOJI = {"W": "🟩", "D": "🟨", "L": "🟥"}
 # /standings: emoji de la fila de títulos de la tabla
 HEADER_EMOJI = "⚽"
@@ -111,18 +115,17 @@ class Info(commands.Cog):
         await interaction.response.defer()
         groups = await self.football.matches_on(day, chosen.code if chosen else None)
 
-        embed = discord.Embed(title=f"Matches · {day:%A %d %B %Y}", color=COLOR)
-        if chosen:
-            # Con una sola liga: su nombre en el título y su logo en la esquina.
-            embed.title = f"{chosen.emoji} {chosen.name} · {day:%A %d %B}"
-            if groups and (emblem := image_url(groups[0].competition.emblem)):
-                embed.set_thumbnail(url=emblem)
-        if not groups:
-            embed.description = "No matches on this day."
-        # Una sección (campo) por liga, repartidas en varios embeds si no caben en uno.
-        embeds = pack_fields(embed, _match_fields(groups, self.football.tz, single=bool(chosen)))
-        embeds[-1].set_footer(text=f"Kick-off times in {self.football.tz.key}")
-        await interaction.followup.send(embeds=embeds)
+        # Un embed por liga, con su color y su logo (issue #13)
+        batches = _league_embeds(
+            groups,
+            self.football.tz,
+            title=f"📅 Matches · {day:%A %d %B %Y}",
+            color=COLOR,
+            empty="No matches on this day.",
+            footer=f"Kick-off times in {self.football.tz.key}",
+        )
+        for batch in batches:
+            await interaction.followup.send(embeds=batch)
 
     # /live [league]
     @app_commands.command(description="Matches being played right now")
@@ -133,12 +136,16 @@ class Info(commands.Cog):
         await interaction.response.defer()
         groups = await self.football.live(chosen.code if chosen else None)
 
-        embed = discord.Embed(title="🔴 Live now", color=discord.Color.red())
-        if not groups:
-            embed.description = "No matches in progress right now. Try `/matches`."
-        embeds = pack_fields(embed, _match_fields(groups, self.football.tz, single=bool(chosen)))
-        embeds[-1].set_footer(text="Free data is delayed a few minutes")
-        await interaction.followup.send(embeds=embeds)
+        batches = _league_embeds(
+            groups,
+            self.football.tz,
+            title="🔴 Live now",
+            color=discord.Color.red(),
+            empty="No matches in progress right now. Try `/matches`.",
+            footer="Free data is delayed a few minutes",
+        )
+        for batch in batches:
+            await interaction.followup.send(embeds=batch)
 
     # /standings <league>
     @app_commands.command(description="League table")
@@ -335,9 +342,16 @@ class Info(commands.Cog):
     async def leagues(self, interaction: discord.Interaction) -> None:
         # No llama a la API (la lista es fija, services/leagues.py), así que responde directo
         # con send_message, sin defer.
-        lines = [f"{lg.emoji} `{lg.code:<3}` **{lg.name}** · {lg.area}" for lg in LEAGUES]
-        embed = discord.Embed(title="Available leagues", description="\n".join(lines), color=COLOR)
-        embed.set_footer(text="Use the code or the name in any league option")
+        embed = discord.Embed(
+            title="🏟️ Available leagues",
+            description="Use the **code** or the name in any league option, e.g. "
+            "`/standings league:PL`.",
+            color=COLOR,
+        )
+        for region, leagues in _leagues_by_region():
+            lines = [f"{lg.emoji} `{lg.code:<3}` **{lg.name}** · {lg.area}" for lg in leagues]
+            embed.add_field(name=region, value="\n".join(lines), inline=False)
+        embed.set_footer(text="Free data from football-data.org")
         await interaction.response.send_message(embed=embed)
 
 
@@ -361,22 +375,85 @@ def _match_line(match: Match, tz: ZoneInfo) -> str:
     label = _STATUS_LABELS.get(match.status, match.status[:4])
     if match.is_live:
         label = f"🔴{label}"
+    elif match.is_finished:
+        # Terminado: el ganador en negrita
+        hs, as_ = match.home_score, match.away_score
+        if hs > as_:
+            home = f"**{home}**"
+        elif as_ > hs:
+            away = f"**{away}**"
+        return f"`{label:>5}` {home} {hs}-{as_} {away}"
     return f"`{label:>5}` {home} **{match.home_score}-{match.away_score}** {away}"
 
 
-def _match_fields(groups: list[MatchGroup], tz: ZoneInfo, *, single: bool) -> list[tuple[str, str]]:
-    """Un campo (título, texto) por liga. `single`: se pidió una sola liga, el título ya la dice."""
-    fields = []
+def _league_embeds(
+    groups: list[MatchGroup],
+    tz: ZoneInfo,
+    *,
+    title: str,
+    color: discord.Color,
+    empty: str,
+    footer: str,
+) -> list[list[discord.Embed]]:
+    """/matches y /live: una cabecera y un embed por liga (con su color y logo).
+
+    Devuelve "tandas" de embeds: cada tanda es un mensaje. Discord deja como mucho 10 embeds
+    y 6000 caracteres por mensaje, así que un sábado con muchas ligas sale en 2 mensajes.
+    """
+    total = sum(len(g.matches) for g in groups)
+    header = discord.Embed(title=title, color=color)
+    if groups:
+        matches = "match" if total == 1 else "matches"
+        competitions = "competition" if len(groups) == 1 else "competitions"
+        header.description = f"**{total}** {matches} in **{len(groups)}** {competitions}"
+    else:
+        header.description = empty
+    embeds = [header]
     for group in groups:
         league = get_league(group.competition.code)
         name = f"{league.emoji} {league.name}" if league else group.competition.name
-        if single:
-            name = "Matches"
         lines = [_match_line(m, tz) for m in group.matches]
-        # Si no cabe en un campo de 1024 caracteres, sigue en otro "(cont.)".
-        for i, chunk in enumerate(split_lines(lines)):
-            fields.append((name if i == 0 else f"{name} (cont.)", chunk))
-    return fields
+        # Si una liga no cabe en un embed (4096 caracteres), sigue en otro "(cont.)"
+        for i, chunk in enumerate(split_lines(lines, MAX_DESCRIPTION)):
+            embed = discord.Embed(
+                title=name if i == 0 else f"{name} (cont.)",
+                description=chunk,
+                color=discord.Color(COLORS.get(group.competition.code, COLOR.value)),
+            )
+            if i == 0 and (emblem := image_url(group.competition.emblem)):
+                embed.set_thumbnail(url=emblem)
+            embeds.append(embed)
+    embeds[-1].set_footer(text=footer)
+
+    batches: list[list[discord.Embed]] = [[]]
+    used = 0
+    for embed in embeds:
+        size = len(embed)
+        if batches[-1] and (
+            len(batches[-1]) >= MAX_EMBEDS_PER_MESSAGE or used + size > MAX_EMBED_CHARS
+        ):
+            batches.append([])
+            used = 0
+        batches[-1].append(embed)
+        used += size
+    return batches
+
+
+def _leagues_by_region() -> list[tuple[str, list[League]]]:
+    """/leagues: las ligas en tres grupos, en el orden de LEAGUES."""
+    regions: dict[str, list[League]] = {
+        "🌍 Europe": [],
+        "🌎 South America": [],
+        "🏆 International": [],
+    }
+    for league in LEAGUES:
+        if league.code in ("CL", "WC", "EC"):
+            regions["🏆 International"].append(league)
+        elif league.area in ("Brazil", "South America"):
+            regions["🌎 South America"].append(league)
+        else:
+            regions["🌍 Europe"].append(league)
+    return [(name, leagues) for name, leagues in regions.items() if leagues]
 
 
 def _table_block(table: Standing, code: str) -> str:

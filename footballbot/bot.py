@@ -46,6 +46,8 @@ EXTENSIONS = (
 
 # Discord messages are capped at 2000 characters
 MAX_TRACEBACK = 1800
+# Color de los mensajes de error
+ERROR_COLOR = discord.Color.from_rgb(234, 67, 53)
 
 
 class FootballBot(commands.Bot):
@@ -185,14 +187,15 @@ class FootballBot(commands.Bot):
             log.exception("Could not send the error report to channel %s", channel_id)
 
     async def _reply_error(self, interaction: discord.Interaction, message: str) -> None:
-        """Responde el error al usuario. ephemeral=True: solo él lo ve."""
+        """Responde el error al usuario en un embed rojo corto. ephemeral=True: solo él lo ve."""
+        embed = discord.Embed(description=f"❌ {message}", color=ERROR_COLOR)
         try:
             # Si el comando ya hizo defer() (el "FootballTrivia is thinking..."), hay que
             # responder con followup; si no, con response.send_message.
             if interaction.response.is_done():
-                await interaction.followup.send(message, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=True)
             else:
-                await interaction.response.send_message(message, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=True)
         except discord.HTTPException:
             # La interacción pudo vencer (Discord da 15 minutos); no hay a quién responder.
             log.warning("Could not send the error message for /%s", _command_name(interaction))

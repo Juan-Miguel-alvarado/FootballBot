@@ -14,8 +14,8 @@ The **Image** column describes the image the command produces or uses.
 
 | Command | What it does | Image | Priority |
 |---|---|---|---|
-| `/matches [league] [date]` | Today's matches (or a given date) grouped by league | Crests in the embed | MVP |
-| `/live [league]` | Matches in progress with score (the free plan does not give the minute) | Crests | MVP |
+| `/matches [league] [date]` | Today's matches (or a given date): one embed per league in its color, winners in bold | League logo per embed | MVP |
+| `/live [league]` | Matches in progress with score, one embed per league (the free plan does not give the minute) | League logo per embed | MVP |
 | `/standings <league>` | League table with the leader on top and a color per zone (🔵 Champions, 🟠 Europa, 🟢 Conference, 🟡 playoff, 🔴 relegation) | **Generated card**: league header, crests, a color stripe per zone and the legend (text table as a fallback) | MVP |
 | `/team <name>` | Profile: crest, country, stadium, coach, founded, colors, recent form, last and next match | **Generated card** in the club's color: big crest, W/D/L form boxes and the next match as a "versus" (text embed as a fallback) | MVP |
 | `/scorers <league>` | Top 10 scorers | Card with player photos | v2 |
@@ -27,7 +27,7 @@ The **Image** column describes the image the command produces or uses.
 | `/h2h <team1> <team2>` | Head-to-head history | Versus card + win bars | Idea |
 | `/compare <player1> <player2>` | Compare two players | Generated **radar chart** | Idea |
 | `/follow <team>` / `/unfollow <team>` | Goal, kick-off and full-time alerts in the channel | Goal card | v2 |
-| `/leagues` | Available leagues and their codes | — | MVP |
+| `/leagues` | Available leagues and their codes, grouped by region | — | MVP |
 
 Every team/player/league argument uses **autocomplete** (Discord suggests while typing).
 
@@ -98,8 +98,8 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 
 | Command | What it does | Priority |
 |---|---|---|
-| `/help [command]` | Command list with examples | MVP |
-| `/ping` | Bot latency and API status | MVP |
+| `/help [command]` | Commands by category (⚽ Football · 🧩 Trivia · 🛠️ Utilities) with examples | MVP |
+| `/ping` | Bot latency and API status, colored 🟢🟡🔴 by latency | MVP |
 | `/config trivia-channel <channel>` | Restrict trivia to one channel | v2 |
 | `/config leagues <leagues>` | Server's default leagues | v2 |
 | `/config answers <buttons\|typed>` | Default answer mode | v2 |

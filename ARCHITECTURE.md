@@ -276,7 +276,7 @@ The core is Python. JS/TS only comes in where it adds value:
 
 ## Error handling
 
-`bot.on_app_command_error` turns every exception into a short ephemeral message:
+`bot.on_app_command_error` turns every exception into a short red embed that only the user sees:
 
 | Error | User sees | Reported to `#errors` |
 |---|---|---|

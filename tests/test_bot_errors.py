@@ -46,9 +46,11 @@ async def reply_for(bot: FootballBot, error: Exception) -> str:
     interaction = fake_interaction()
     wrapped = app_commands.CommandInvokeError(MagicMock(), error)
     await bot.on_app_command_error(interaction, wrapped)
-    args, kwargs = interaction.response.send_message.call_args
+    _, kwargs = interaction.response.send_message.call_args
     assert kwargs["ephemeral"] is True  # solo lo ve quien usó el comando
-    return args[0]
+    embed = kwargs["embed"]
+    assert embed.description.startswith("❌ ")  # embed rojo con una ✖
+    return embed.description.removeprefix("❌ ")
 
 
 async def test_not_in_plan_message(bot: FootballBot) -> None:

@@ -124,3 +124,66 @@ def test_standings_table_has_zone_emojis_and_legend() -> None:
     assert lines[-2].startswith("🔴 20 ")
     assert _zone_legend("PL", [table]).startswith("🔵 Champions League")
     assert _leader_line(table).startswith("👑 **Man City** · 21 pts")
+
+
+# --- /matches, /live, /leagues y /ping más bonitos (issue #13) --------------------------------
+
+
+def _group(code: str, count: int):
+    from datetime import UTC, datetime
+
+    from footballbot.models import Competition, Match, MatchStatus, Team
+    from footballbot.services.football import MatchGroup
+
+    comp = Competition(code, code, "X")
+    matches = tuple(
+        Match(i, comp, datetime(2026, 11, 1, 15, tzinfo=UTC), MatchStatus.FINISHED,
+              Team(1, "Arsenal", "Arsenal"), Team(2, "Chelsea", "Chelsea"), 2, 1)
+        for i in range(count)
+    )  # fmt: skip
+    return MatchGroup(comp, matches)
+
+
+def test_league_embeds_respect_discord_limits() -> None:
+    from zoneinfo import ZoneInfo
+
+    from footballbot.cogs.common import MAX_EMBED_CHARS, MAX_EMBEDS_PER_MESSAGE
+    from footballbot.cogs.info import _league_embeds
+
+    codes = ["PL", "PD", "SA", "BL1", "FL1", "DED", "PPL", "ELC", "BSA", "CL", "CLI", "WC", "EC"]
+    groups = [_group(code, 12) for code in codes]
+    batches = _league_embeds(groups, ZoneInfo("UTC"), title="Matches", color=discord.Color.green(),
+                             empty="none", footer="footer")  # fmt: skip
+    embeds = [e for batch in batches for e in batch]
+    assert len(embeds) == 1 + len(codes)  # cabecera + una por liga
+    assert len(batches) >= 2
+    for batch in batches:
+        assert len(batch) <= MAX_EMBEDS_PER_MESSAGE
+        assert sum(len(e) for e in batch) <= MAX_EMBED_CHARS
+    assert embeds[0].description == "**156** matches in **13** competitions"
+    assert embeds[1].title == "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League"
+    assert embeds[-1].footer.text == "footer"
+
+
+def test_finished_match_shows_the_winner_in_bold() -> None:
+    from zoneinfo import ZoneInfo
+
+    from footballbot.cogs.info import _match_line
+
+    line = _match_line(_group("PL", 1).matches[0], ZoneInfo("UTC"))
+    assert line == "`   FT` **Arsenal** 2-1 Chelsea"
+
+
+def test_leagues_by_region() -> None:
+    from footballbot.cogs.info import _leagues_by_region
+
+    regions = dict(_leagues_by_region())
+    assert {lg.code for lg in regions["🏆 International"]} == {"CL", "WC", "EC"}
+    assert {lg.code for lg in regions["🌎 South America"]} == {"BSA", "CLI"}
+    assert sum(len(v) for v in regions.values()) == 13
+
+
+def test_ping_colors() -> None:
+    from footballbot.cogs.admin import _latency_dot
+
+    assert [_latency_dot(ms) for ms in (50, 200, 900)] == ["🟢", "🟡", "🔴"]
