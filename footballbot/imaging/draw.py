@@ -187,3 +187,39 @@ def color_from_names(colors: str | None, default: RGB = WIN) -> RGB:
             return COLOR_NAMES[name]
     # Solo blanco/negro/gris (Juventus, Newcastle...): un gris oscuro, para que el texto se lea
     return NEUTRAL_ACCENT if known else default
+
+
+# Medallas del podio y del ranking
+GOLD: RGB = (255, 196, 0)
+SILVER: RGB = (192, 198, 210)
+BRONZE: RGB = (205, 127, 50)
+MEDALS: tuple[RGB, ...] = (GOLD, SILVER, BRONZE)
+
+
+def avatar(
+    data: bytes | None, size: int, name: str = "?", fill: RGB = (88, 101, 242)
+) -> Image.Image:
+    """Avatar redondo de `size` px. Sin imagen, un círculo de color con la inicial del nombre."""
+    mask = Image.new("L", (size * 4, size * 4), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, size * 4 - 1, size * 4 - 1), fill=255)
+    mask = mask.resize((size, size), Image.Resampling.LANCZOS)  # borde suave
+
+    picture: Image.Image | None = None
+    if data:
+        try:
+            picture = (
+                Image.open(io.BytesIO(data))
+                .convert("RGBA")
+                .resize((size, size), Image.Resampling.LANCZOS)
+            )
+        except OSError:
+            picture = None
+    if picture is None:
+        picture = Image.new("RGBA", (size, size), (*fill, 255))
+        initial = (name.strip()[:1] or "?").upper()
+        ImageDraw.Draw(picture).text(
+            (size // 2, size // 2), initial, font=font("title", size // 2, "Bold"),
+            fill=TEXT, anchor="mm",
+        )  # fmt: skip
+    picture.putalpha(mask)
+    return picture

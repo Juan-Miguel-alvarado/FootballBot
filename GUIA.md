@@ -62,6 +62,7 @@ footballbot/
 │   ├── effects.py           Pixelar y desenfocar (funciones puras con Pillow)
 │   ├── draw.py              Estilo de las tarjetas: fuentes, colores, degradados, texto
 │   ├── cards.py             Tarjetas en imagen: tabla de posiciones y perfil de equipo
+│   ├── trivia_cards.py      Tarjetas de la trivia: ronda, respuesta, podio y ranking
 │   └── fonts/               Inter (texto) y Oswald (títulos), fuentes libres (OFL)
 │
 ├── storage/                 ── BASE DE DATOS (SQLite) ──

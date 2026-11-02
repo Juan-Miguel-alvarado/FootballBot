@@ -32,6 +32,7 @@ class Mode:
     # pixelate: cuántos "bloques" de ancho tiene la imagen. blur: radio del desenfoque.
     levels: tuple[float, ...]
     pool: str  # de dónde salen las respuestas: "teams" o "leagues"
+    color: int = 0x34C759  # color del modo en las tarjetas y embeds de la trivia
 
 
 MODES: dict[str, Mode] = {
@@ -42,6 +43,7 @@ MODES: dict[str, Mode] = {
         effect="pixelate",
         levels=(6, 10, 16, 28),
         pool="teams",
+        color=0x34C759,
     ),
     "blur": Mode(
         key="blur",
@@ -50,6 +52,7 @@ MODES: dict[str, Mode] = {
         effect="blur",
         levels=(32, 20, 12, 6),
         pool="teams",
+        color=0x0A84FF,
     ),
     "league": Mode(
         key="league",
@@ -58,6 +61,7 @@ MODES: dict[str, Mode] = {
         effect="pixelate",
         levels=(6, 10, 16, 28),
         pool="leagues",
+        color=0xAF52DE,
     ),
 }
 
