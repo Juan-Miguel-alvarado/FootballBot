@@ -7,10 +7,10 @@ Quién lo usa:
 - `/leagues` muestra esta lista (cogs/info.py).
 - El autocompletado y `parse_league` de los comandos (cogs/common.py) buscan aquí.
 - El orden de `LEAGUES` decide en qué orden salen las ligas en /matches y /live.
-- `/standings` usa ZONES (los colores de cada tramo de la tabla) y COLORS (color del embed).
+- `/standings` usa ZONES y ZONE_RGB (los colores de cada tramo de la tabla).
 
 Para añadir una liga: agrega una línea `League(...)` en `LEAGUES` con el código que usa
-football-data.org (la lista de códigos está en APIS.md), y si quieres, sus zonas y su color.
+football-data.org (la lista de códigos está en APIS.md), y si quieres, sus zonas.
 """
 
 from dataclasses import dataclass
@@ -74,12 +74,13 @@ class Zone:
 UCL, UEL, UECL = "🔵", "🟠", "🟢"
 PLAYOFF, DOWN, NONE = "🟡", "🔴", "⚪"
 # Los mismos colores en RGB para las tarjetas de imagen (imaging/cards.py)
+# Paleta del logo del bot: tonos de azul para Europa, ámbar y rojo apagados para el resto
 ZONE_RGB: dict[str, tuple[int, int, int]] = {
-    UCL: (66, 133, 244),
-    UEL: (255, 152, 0),
-    UECL: (52, 199, 89),
-    PLAYOFF: (255, 204, 0),
-    DOWN: (234, 67, 53),
+    UCL: (11, 150, 254),
+    UEL: (130, 196, 255),
+    UECL: (60, 80, 230),
+    PLAYOFF: (212, 167, 44),
+    DOWN: (214, 69, 69),
 }
 
 # Zonas por liga. Son las habituales de cada competición: pueden cambiar un poco cada
@@ -113,13 +114,6 @@ ZONES: dict[str, tuple[Zone, ...]] = {
     "CLI": (Zone(1, 2, UCL, "Next round"), Zone(3, 3, UECL, "Copa Sudamericana")),
     "WC": (Zone(1, 2, UCL, "Next round"),),
     "EC": (Zone(1, 2, UCL, "Next round"),),
-}  # fmt: skip
-
-# Color de la barra lateral del embed de cada liga (el de su marca, aproximado)
-COLORS: dict[str, int] = {
-    "PL": 0x3D195B, "PD": 0xFF4B44, "SA": 0x008FD7, "BL1": 0xD20515, "FL1": 0xDAE025,
-    "DED": 0xF15A22, "PPL": 0x00A859, "ELC": 0x1C2C5B, "BSA": 0x00953B, "CL": 0x0E1E5B,
-    "CLI": 0xC8A04B, "WC": 0x8A1538, "EC": 0x143CDB,
 }  # fmt: skip
 
 

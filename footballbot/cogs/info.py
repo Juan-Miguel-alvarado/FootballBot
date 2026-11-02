@@ -28,6 +28,7 @@ from footballbot.cogs.common import (
     COLOR,
     MAX_EMBED_CHARS,
     MAX_EMBEDS_PER_MESSAGE,
+    branded,
     date_autocomplete,
     image_url,
     league_autocomplete,
@@ -39,12 +40,10 @@ from footballbot.cogs.common import (
 )
 from footballbot.errors import UserFacingError
 from footballbot.imaging import cards
-from footballbot.imaging.draw import color_from_names, hex_rgb
 from footballbot.models import Match, MatchStatus, Standing
 from footballbot.providers.base import NotFoundError
 from footballbot.services.football import MatchGroup, TeamProfile
 from footballbot.services.leagues import (
-    COLORS,
     LEAGUES,
     NONE,
     ZONE_RGB,
@@ -119,11 +118,12 @@ class Info(commands.Cog):
         batches = _league_embeds(
             groups,
             self.football.tz,
-            title=f"📅 Matches · {day:%A %d %B %Y}",
+            title=f"Matches · {day:%A %d %B %Y}",
             color=COLOR,
             empty="No matches on this day.",
             footer=f"Kick-off times in {self.football.tz.key}",
         )
+        branded(batches[-1][-1], self.bot)
         for batch in batches:
             await interaction.followup.send(embeds=batch)
 
@@ -144,6 +144,7 @@ class Info(commands.Cog):
             empty="No matches in progress right now. Try `/matches`.",
             footer="Free data is delayed a few minutes",
         )
+        branded(batches[-1][-1], self.bot)
         for batch in batches:
             await interaction.followup.send(embeds=batch)
 
@@ -169,8 +170,7 @@ class Info(commands.Cog):
 
         competition = tables[0].competition
         # Cada liga con el color de su marca en la barra lateral del embed
-        color = discord.Color(COLORS.get(chosen.code, COLOR.value))
-        embed = discord.Embed(title=f"{chosen.emoji} {chosen.name} · Standings", color=color)
+        embed = discord.Embed(title=f"{chosen.emoji} {chosen.name} · Standings", color=COLOR)
 
         # Primero la tarjeta en imagen (issue #10); si algo falla, la tabla en texto de siempre
         png = await self._standings_image(chosen, tables)
@@ -178,7 +178,7 @@ class Info(commands.Cog):
             embed.description = _leader_line(tables[0]) if len(tables) == 1 else None
             embed.set_image(url="attachment://standings.png")
             file = discord.File(io.BytesIO(png), filename="standings.png")
-            await interaction.followup.send(embed=embed, file=file)
+            await interaction.followup.send(embed=branded(embed, self.bot), file=file)
             return
 
         if thumbnail := image_url(competition.emblem):
@@ -197,6 +197,7 @@ class Info(commands.Cog):
             embeds = pack_fields(embed, fields)
         if tables[0].matchday:
             embeds[-1].set_footer(text=f"Matchday {tables[0].matchday}")
+        branded(embeds[-1], self.bot)
         await interaction.followup.send(embeds=embeds)
 
     # /team <team>
@@ -217,7 +218,7 @@ class Info(commands.Cog):
             embed.url = profile.team.website
         embed.set_image(url="attachment://team.png")
         file = discord.File(io.BytesIO(png), filename="team.png")
-        await interaction.followup.send(embed=embed, file=file)
+        await interaction.followup.send(embed=branded(embed, self.bot), file=file)
 
     # --- tarjetas en imagen ----------------------------------------------------------------
 
@@ -270,7 +271,6 @@ class Info(commands.Cog):
                 cards.standings_card,
                 title=league.name,
                 subtitle=subtitle,
-                accent=hex_rgb(COLORS.get(league.code, COLOR.value)),
                 emblem=emblem,
                 groups=groups,
                 legend=legend,
@@ -327,7 +327,6 @@ class Info(commands.Cog):
                 name=team.short_name,
                 subtitle=subtitle,
                 crest=crest,
-                accent=color_from_names(team.colors),
                 facts=facts,
                 form=form,
                 last_result=last_result,
@@ -343,7 +342,7 @@ class Info(commands.Cog):
         # No llama a la API (la lista es fija, services/leagues.py), así que responde directo
         # con send_message, sin defer.
         embed = discord.Embed(
-            title="🏟️ Available leagues",
+            title="Available leagues",
             description="Use the **code** or the name in any league option, e.g. "
             "`/standings league:PL`.",
             color=COLOR,
@@ -352,7 +351,7 @@ class Info(commands.Cog):
             lines = [f"{lg.emoji} `{lg.code:<3}` **{lg.name}** · {lg.area}" for lg in leagues]
             embed.add_field(name=region, value="\n".join(lines), inline=False)
         embed.set_footer(text="Free data from football-data.org")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=branded(embed, self.bot))
 
 
 # --- formatting --------------------------------------------------------------------------------
@@ -418,7 +417,7 @@ def _league_embeds(
             embed = discord.Embed(
                 title=name if i == 0 else f"{name} (cont.)",
                 description=chunk,
-                color=discord.Color(COLORS.get(group.competition.code, COLOR.value)),
+                color=COLOR,
             )
             if i == 0 and (emblem := image_url(group.competition.emblem)):
                 embed.set_thumbnail(url=emblem)
@@ -442,17 +441,17 @@ def _league_embeds(
 def _leagues_by_region() -> list[tuple[str, list[League]]]:
     """/leagues: las ligas en tres grupos, en el orden de LEAGUES."""
     regions: dict[str, list[League]] = {
-        "🌍 Europe": [],
-        "🌎 South America": [],
-        "🏆 International": [],
+        "Europe": [],
+        "South America": [],
+        "International": [],
     }
     for league in LEAGUES:
         if league.code in ("CL", "WC", "EC"):
-            regions["🏆 International"].append(league)
+            regions["International"].append(league)
         elif league.area in ("Brazil", "South America"):
-            regions["🌎 South America"].append(league)
+            regions["South America"].append(league)
         else:
-            regions["🌍 Europe"].append(league)
+            regions["Europe"].append(league)
     return [(name, leagues) for name, leagues in regions.items() if leagues]
 
 
@@ -482,11 +481,11 @@ def _table_block(table: Standing, code: str) -> str:
 
 
 def _leader_line(table: Standing) -> str:
-    """ "👑 **Man City** lead on goal difference over Arsenal" o "... lead by 3 points"."""
+    """ "Leader: **Man City** · 21 pts, level on points with Arsenal" o "... 3 points clear"."""
     if not table.rows:
         return ""
     first = table.rows[0]
-    line = f"👑 **{first.team.short_name}** · {first.points} pts"
+    line = f"Leader: **{first.team.short_name}** · {first.points} pts"
     if len(table.rows) > 1:
         second = table.rows[1]
         gap = first.points - second.points

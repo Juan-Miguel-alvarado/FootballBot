@@ -38,7 +38,6 @@ class Mode:
     # pixelate: cuántos "bloques" de ancho tiene la imagen. blur: radio del desenfoque.
     levels: tuple[float, ...]
     pool: str  # de dónde salen las respuestas: "teams", "leagues" o "countries"
-    color: int = 0x34C759  # color del modo en las tarjetas y embeds de la trivia
     kind: str = "guess"  # "guess", "club-country" o "mix" (ver arriba)
 
 
@@ -50,7 +49,6 @@ MODES: dict[str, Mode] = {
         effect="pixelate",
         levels=(6, 10, 16, 28),
         pool="teams",
-        color=0x34C759,
     ),
     "blur": Mode(
         key="blur",
@@ -59,7 +57,6 @@ MODES: dict[str, Mode] = {
         effect="blur",
         levels=(32, 20, 12, 6),
         pool="teams",
-        color=0x0A84FF,
     ),
     "league": Mode(
         key="league",
@@ -68,7 +65,6 @@ MODES: dict[str, Mode] = {
         effect="pixelate",
         levels=(6, 10, 16, 28),
         pool="leagues",
-        color=0xAF52DE,
     ),
     "silhouette": Mode(
         key="silhouette",
@@ -78,7 +74,6 @@ MODES: dict[str, Mode] = {
         # Cuánto color asoma en cada etapa: al principio solo la forma
         levels=(0, 0.04, 0.12, 0.3),
         pool="teams",
-        color=0xFF9F0A,
     ),
     "zoom": Mode(
         key="zoom",
@@ -88,7 +83,6 @@ MODES: dict[str, Mode] = {
         # Qué parte del escudo se ve: empieza por un trocito y se va abriendo
         levels=(0.18, 0.3, 0.5, 0.8),
         pool="teams",
-        color=0xFF375F,
     ),
     "club-country": Mode(
         key="club-country",
@@ -97,7 +91,6 @@ MODES: dict[str, Mode] = {
         effect="none",  # el escudo se ve entero: lo difícil es saber el país
         levels=(0, 0, 0, 0),
         pool="teams",
-        color=0x64D2FF,
         kind="club-country",
     ),
     "flag": Mode(
@@ -107,7 +100,6 @@ MODES: dict[str, Mode] = {
         effect="pixelate",
         levels=(5, 8, 14, 26),
         pool="countries",
-        color=0xFFD60A,
     ),
     "mix": Mode(
         key="mix",
@@ -116,7 +108,6 @@ MODES: dict[str, Mode] = {
         effect="pixelate",  # no se usa: cada ronda toma el efecto del modo que le toca
         levels=(6, 10, 16, 28),
         pool="teams",
-        color=0xBF5AF2,
         kind="mix",
     ),
 }

@@ -20,7 +20,7 @@ from PIL import Image
 from footballbot.cogs.info import Info
 from footballbot.config import Settings
 from footballbot.imaging import trivia_cards
-from footballbot.imaging.draw import BG_BOTTOM, hex_rgb
+from footballbot.imaging.draw import BLACK
 from footballbot.imaging.effects import render_stage
 from footballbot.imaging.loader import ImageLoader
 from footballbot.providers.football_data import FootballDataProvider
@@ -47,7 +47,7 @@ def frame(png: bytes, crop_top: bool = False) -> Image.Image:
         height = round(image.width * FRAME[1] / FRAME[0])
         image = image.crop((0, 0, image.width, min(height, image.height)))
     image.thumbnail(FRAME, Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", FRAME, BG_BOTTOM)
+    canvas = Image.new("RGB", FRAME, BLACK)
     canvas.paste(image, ((FRAME[0] - image.width) // 2, (FRAME[1] - image.height) // 2))
     return canvas
 
@@ -63,17 +63,16 @@ def trivia_round(
 ) -> list[tuple[Image.Image, int]]:
     """Las etapas de una ronda (cada vez más clara) y la tarjeta de la respuesta."""
     mode = MODES[mode_key]
-    accent = hex_rgb(mode.color)
     frames = []
     for stage in range(stages):
         stage_image = render_stage(image, mode.effect, mode.levels[stage], seed=round_no)
         card = trivia_cards.round_card(
             stage_image=stage_image, round_no=round_no, total_rounds=10, title=mode.title,
-            accent=accent, stage=stage, points=STAGE_POINTS,
+            stage=stage, points=STAGE_POINTS,
         )  # fmt: skip
         frames.append((frame(card), STAGE_MS))
     reveal = trivia_cards.reveal_card(
-        crest=image, name=name, subtitle=subtitle, accent=accent, headline=headline, success=True
+        crest=image, name=name, subtitle=subtitle, headline=headline, success=True
     )
     frames.append((frame(reveal), CARD_MS))
     return frames
@@ -115,7 +114,6 @@ async def main() -> None:
 
         podium = trivia_cards.podium_card(
             title="Game over", subtitle="Mix · 10 rounds · easy",
-            accent=hex_rgb(MODES["mix"].color),
             players=[trivia_cards.PlayerEntry(n, None, p) for n, p in PLAYERS],
         )  # fmt: skip
         frames.append((frame(podium), CARD_MS))

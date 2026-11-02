@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from footballbot.imaging import cards
-from footballbot.imaging.draw import color_from_names, fit_font, truncate
+from footballbot.imaging.draw import fit_font, truncate
 from footballbot.models import Competition, Standing
 from footballbot.providers.football_data import _standing_row
 from tests.conftest import load_fixture
@@ -29,20 +29,34 @@ def crest() -> bytes:
 
 def rows(count: int, with_crest: bool = True) -> tuple[cards.TableRow, ...]:
     return tuple(
-        cards.TableRow(i, f"Club {i}", crest() if with_crest else None, 10, 5, 3, 2, 4, 18,
-                       (66, 133, 244) if i <= 4 else None)
+        cards.TableRow(
+            i,
+            f"Club {i}",
+            crest() if with_crest else None,
+            10,
+            5,
+            3,
+            2,
+            4,
+            18,
+            (66, 133, 244) if i <= 4 else None,
+        )
         for i in range(1, count + 1)
-    )  # fmt: skip
+    )
 
 
 @pytest.mark.parametrize("count", [18, 20, 24, 36])
 def test_standings_card_fits_every_row(count: int) -> None:
     group = cards.TableGroup(None, rows(count))
     width, height = png_size(
-        cards.standings_card(title="League", subtitle="Standings", accent=(61, 25, 91),
-                             emblem=crest(), groups=[group],
-                             legend=[((66, 133, 244), "Champions League")])
-    )  # fmt: skip
+        cards.standings_card(
+            title="League",
+            subtitle="Standings",
+            emblem=crest(),
+            groups=[group],
+            legend=[((66, 133, 244), "Champions League")],
+        )
+    )
     assert width == cards.WIDTH
     # Cabecera + columnas + una fila de al menos 40 px por equipo + leyenda
     assert height >= cards.HEADER_H + cards.COLUMNS_H + count * 40
@@ -51,13 +65,14 @@ def test_standings_card_fits_every_row(count: int) -> None:
 def test_standings_card_with_groups_and_missing_crests() -> None:
     groups = [cards.TableGroup(f"Group {g}", rows(4, with_crest=False)) for g in "ABCD"]
     single = png_size(
-        cards.standings_card(title="Cup", subtitle="", accent=(0, 0, 0), emblem=None,
-                             groups=[cards.TableGroup(None, rows(16, with_crest=False))])
-    )  # fmt: skip
-    grouped = png_size(
-        cards.standings_card(title="Cup", subtitle="", accent=(0, 0, 0), emblem=None,
-                             groups=groups)
-    )  # fmt: skip
+        cards.standings_card(
+            title="Cup",
+            subtitle="",
+            emblem=None,
+            groups=[cards.TableGroup(None, rows(16, with_crest=False))],
+        )
+    )
+    grouped = png_size(cards.standings_card(title="Cup", subtitle="", emblem=None, groups=groups))
     assert grouped[1] == single[1] + 4 * cards.GROUP_TITLE_H
 
 
@@ -65,19 +80,16 @@ def test_team_card_with_and_without_next_match() -> None:
     nxt = cards.NextMatch(crest(), None, "Barça", False, "Sun 25 Oct · 15:00", "La Liga")
     for next_match, form in ((nxt, ["W", "D", "L"]), (None, [])):
         size = png_size(
-            cards.team_card(name="Real Madrid", subtitle="Spain · Founded 1902", crest=crest(),
-                            accent=(110, 50, 160), facts=[("Stadium", "Bernabéu")], form=form,
-                            next_match=next_match)
-        )  # fmt: skip
+            cards.team_card(
+                name="Real Madrid",
+                subtitle="Spain · Founded 1902",
+                crest=crest(),
+                facts=[("Stadium", "Bernabéu")],
+                form=form,
+                next_match=next_match,
+            )
+        )
         assert size == (cards.WIDTH, 640)
-
-
-def test_color_from_names() -> None:
-    assert color_from_names("White / Purple") == (110, 50, 160)
-    assert color_from_names("Red / White") == (210, 35, 42)
-    assert color_from_names("Black / White") == (85, 90, 105)  # solo neutros: gris oscuro
-    assert color_from_names("Dark Blue / Yellow") == (0, 45, 120)
-    assert color_from_names(None) == color_from_names("Weird colors")
 
 
 def test_text_helpers() -> None:
@@ -119,15 +131,26 @@ def test_round_and_reveal_cards() -> None:
     stage = render_stage(crest(), "pixelate", 6)
     for current in range(4):
         size = png_size(
-            tc.round_card(stage_image=stage, round_no=1, total_rounds=10, title="Crest",
-                          accent=(52, 199, 89), stage=current, points=(100, 75, 50, 25))
-        )  # fmt: skip
+            tc.round_card(
+                stage_image=stage,
+                round_no=1,
+                total_rounds=10,
+                title="Crest",
+                stage=current,
+                points=(100, 75, 50, 25),
+            )
+        )
         assert size == (tc.WIDTH, 680)
     for success in (True, False):
         size = png_size(
-            tc.reveal_card(crest=crest(), name="Real Madrid", subtitle="Spain · La Liga",
-                           accent=(52, 199, 89), headline="x got it +75", success=success)
-        )  # fmt: skip
+            tc.reveal_card(
+                crest=crest(),
+                name="Real Madrid",
+                subtitle="Spain · La Liga",
+                headline="x got it +75",
+                success=success,
+            )
+        )
         assert size == (tc.WIDTH, 600)
 
 
@@ -136,13 +159,11 @@ def test_podium_and_leaderboard_with_any_number_of_players(count: int) -> None:
     from footballbot.imaging import trivia_cards as tc
 
     players = [tc.PlayerEntry(f"Player {i}", None, 100 - i, "1 correct") for i in range(count)]
-    podium = png_size(tc.podium_card(title="Game over", subtitle="", accent=(0, 0, 0),
-                                     players=players))  # fmt: skip
-    board = png_size(tc.leaderboard_card(title="Leaderboard", subtitle="", accent=(0, 0, 0),
-                                         players=players))  # fmt: skip
+    podium = png_size(tc.podium_card(title="Game over", subtitle="", players=players))
+    board = png_size(tc.leaderboard_card(title="Leaderboard", subtitle="", players=players))
     assert podium[0] == board[0] == tc.WIDTH
     # El podio muestra hasta 10 (3 arriba + 7 en lista); el ranking crece con cada jugador
-    assert board[1] == 140 + count * 76 + 30
+    assert board[1] == 150 + count * 76 + 70
 
 
 def test_avatar_with_and_without_picture() -> None:
@@ -152,3 +173,31 @@ def test_avatar_with_and_without_picture() -> None:
     picture = avatar(crest(), 64, "Juan")
     assert picture.mode == "RGBA"
     assert picture.getpixel((0, 0))[3] == 0  # la esquina queda transparente: es redondo
+
+
+# --- estilo del logo del bot (issue #20) -------------------------------------------------------
+
+
+def test_logo_has_a_transparent_background() -> None:
+    from footballbot.imaging.draw import logo, shards
+
+    image = logo(200)
+    assert image.width == 200
+    assert image.getpixel((0, image.height - 1))[3] == 0  # la esquina (antes negra) es transparente
+    assert shards(80).width == 80
+
+
+def test_branded_footer_keeps_the_text_and_adds_the_logo() -> None:
+    import discord
+
+    from footballbot.cogs.common import branded
+
+    client = SimpleNamespace(
+        user=SimpleNamespace(display_avatar=SimpleNamespace(url="https://x/a.png"))
+    )
+    embed = discord.Embed(title="t")
+    embed.set_footer(text="Matchday 9")
+    branded(embed, client)
+    assert embed.footer.text == "Matchday 9 · FootballTrivia"
+    assert embed.footer.icon_url == "https://x/a.png"
+    assert branded(discord.Embed(), client).footer.text == "FootballTrivia"
