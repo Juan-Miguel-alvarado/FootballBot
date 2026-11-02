@@ -13,6 +13,8 @@ Para añadir un comando: copia `leagues` (el más simple) o `standings` (si llam
 y añádelo a COMMANDS.md.
 """
 
+import asyncio
+import io
 import logging
 from datetime import date
 from zoneinfo import ZoneInfo
@@ -34,10 +36,21 @@ from footballbot.cogs.common import (
     team_autocomplete,
 )
 from footballbot.errors import UserFacingError
+from footballbot.imaging import cards
+from footballbot.imaging.draw import color_from_names, hex_rgb
 from footballbot.models import Match, MatchStatus, Standing
 from footballbot.providers.base import NotFoundError
 from footballbot.services.football import MatchGroup, TeamProfile
-from footballbot.services.leagues import COLORS, LEAGUES, NONE, get_league, zone_for
+from footballbot.services.leagues import (
+    COLORS,
+    LEAGUES,
+    NONE,
+    ZONE_RGB,
+    League,
+    Zone,
+    get_league,
+    zone_for,
+)
 
 log = logging.getLogger(__name__)
 
@@ -151,6 +164,16 @@ class Info(commands.Cog):
         # Cada liga con el color de su marca en la barra lateral del embed
         color = discord.Color(COLORS.get(chosen.code, COLOR.value))
         embed = discord.Embed(title=f"{chosen.emoji} {chosen.name} · Standings", color=color)
+
+        # Primero la tarjeta en imagen (issue #10); si algo falla, la tabla en texto de siempre
+        png = await self._standings_image(chosen, tables)
+        if png:
+            embed.description = _leader_line(tables[0]) if len(tables) == 1 else None
+            embed.set_image(url="attachment://standings.png")
+            file = discord.File(io.BytesIO(png), filename="standings.png")
+            await interaction.followup.send(embed=embed, file=file)
+            return
+
         if thumbnail := image_url(competition.emblem):
             embed.set_thumbnail(url=thumbnail)
         legend = _zone_legend(chosen.code, tables)
@@ -177,7 +200,135 @@ class Info(commands.Cog):
         # `team` trae el id si eligió una sugerencia ("86") o el texto si lo escribió a mano.
         await interaction.response.defer()
         profile = await self.football.team_profile(team)
-        await interaction.followup.send(embed=_team_embed(profile, self.football.tz))
+        # Primero la tarjeta en imagen (issue #10); si algo falla, el embed de texto de siempre
+        png = await self._team_image(profile)
+        if png is None:
+            await interaction.followup.send(embed=_team_embed(profile, self.football.tz))
+            return
+        embed = discord.Embed(title=profile.team.name, color=COLOR)
+        if profile.team.website and profile.team.website.startswith("http"):
+            embed.url = profile.team.website
+        embed.set_image(url="attachment://team.png")
+        file = discord.File(io.BytesIO(png), filename="team.png")
+        await interaction.followup.send(embed=embed, file=file)
+
+    # --- tarjetas en imagen ----------------------------------------------------------------
+
+    async def _images(self, urls: list[str | None]) -> list[bytes | None]:
+        """Baja varias imágenes a la vez (con caché en disco). None si alguna falla."""
+
+        async def one(url: str | None) -> bytes | None:
+            if not (url := image_url(url)):
+                return None
+            try:
+                return await self.bot.images.get(url)
+            except Exception:
+                log.warning("Could not download %s", url)
+                return None
+
+        return list(await asyncio.gather(*(one(url) for url in urls)))
+
+    async def _standings_image(self, league: League, tables: list[Standing]) -> bytes | None:
+        """La tabla como tarjeta PNG, o None si no se pudo generar."""
+        try:
+            urls = [tables[0].competition.emblem] + [r.team.crest for t in tables for r in t.rows]
+            emblem, *crests = await self._images(urls)
+            crest_iter = iter(crests)
+            groups = []
+            for table in tables:
+                rows = []
+                for r in table.rows:
+                    zone = zone_for(league.code, r.position, len(table.rows))
+                    rows.append(
+                        cards.TableRow(
+                            position=r.position,
+                            name=r.team.short_name,
+                            crest=next(crest_iter),
+                            played=r.played,
+                            won=r.won,
+                            draw=r.draw,
+                            lost=r.lost,
+                            goal_difference=r.goal_difference,
+                            points=r.points,
+                            zone_color=ZONE_RGB[zone.emoji] if zone else None,
+                        )
+                    )
+                title = _group_name(table.group) if len(tables) > 1 else None
+                groups.append(cards.TableGroup(title, tuple(rows)))
+            legend = [(ZONE_RGB[z.emoji], z.label) for z in _zones_present(league.code, tables)]
+            subtitle = "Standings"
+            if tables[0].matchday:
+                subtitle += f" · Matchday {tables[0].matchday}"
+            return await asyncio.to_thread(
+                cards.standings_card,
+                title=league.name,
+                subtitle=subtitle,
+                accent=hex_rgb(COLORS.get(league.code, COLOR.value)),
+                emblem=emblem,
+                groups=groups,
+                legend=legend,
+            )
+        except Exception:
+            log.exception("Could not draw the standings card for %s", league.code)
+            return None
+
+    async def _team_image(self, profile: TeamProfile) -> bytes | None:
+        """El perfil del equipo como tarjeta PNG, o None si no se pudo generar."""
+        team = profile.team
+        tz = self.football.tz
+        try:
+            nxt = profile.next_match
+            crest, home_crest, away_crest = await self._images(
+                [team.crest, nxt.home.crest if nxt else None, nxt.away.crest if nxt else None]
+            )
+            subtitle = " · ".join(
+                p for p in (team.country, f"Founded {team.founded}" if team.founded else None) if p
+            )
+            facts = [
+                (label, value)
+                for label, value in (
+                    ("Stadium", team.venue),
+                    ("Coach", team.coach),
+                    ("Colors", team.colors),
+                    ("Competitions", ", ".join(
+                        _competition_name(c.code, c.name) for c in team.competitions)),
+                )
+                if value
+            ]  # fmt: skip
+            form = [m.result_for(team.id) or "?" for m in profile.recent]
+            last_result = None
+            if profile.recent:
+                last = profile.recent[-1]
+                when = _short_date(last.kickoff.astimezone(tz).date())
+                last_result = (
+                    f"{last.home.short_name} {last.home_score}-{last.away_score} "
+                    f"{last.away.short_name} · {when}"
+                )
+            next_match = None
+            if nxt:
+                home = nxt.home.id == team.id
+                next_match = cards.NextMatch(
+                    home_crest=home_crest,
+                    away_crest=away_crest,
+                    opponent=(nxt.away if home else nxt.home).short_name,
+                    home=home,
+                    when=f"{nxt.kickoff.astimezone(tz):%a %d %b · %H:%M}",
+                    competition=_competition_name(nxt.competition.code, nxt.competition.name),
+                )
+            return await asyncio.to_thread(
+                cards.team_card,
+                name=team.short_name,
+                subtitle=subtitle,
+                crest=crest,
+                accent=color_from_names(team.colors),
+                facts=facts,
+                form=form,
+                last_result=last_result,
+                next_match=next_match,
+            )
+        except Exception:
+            log.exception("Could not draw the team card for %s", team.id)
+            return None
 
     # /leagues
     @app_commands.command(description="Leagues and competitions the bot knows, with their codes")
@@ -269,14 +420,19 @@ def _leader_line(table: Standing) -> str:
     return line
 
 
-def _zone_legend(code: str, tables: list[Standing]) -> str:
-    """ "🔵 Champions League · 🟠 Europa League · 🔴 Relegation": solo las zonas que aparecen."""
-    seen: dict[str, str] = {}
+def _zones_present(code: str, tables: list[Standing]) -> list[Zone]:
+    """Las zonas que aparecen en estas tablas, sin repetir y en orden."""
+    seen: dict[str, Zone] = {}
     for table in tables:
         for r in table.rows:
             if zone := zone_for(code, r.position, len(table.rows)):
-                seen.setdefault(zone.label, zone.emoji)
-    return " · ".join(f"{emoji} {label}" for label, emoji in seen.items())
+                seen.setdefault(zone.label, zone)
+    return list(seen.values())
+
+
+def _zone_legend(code: str, tables: list[Standing]) -> str:
+    """ "🔵 Champions League · 🟠 Europa League · 🔴 Relegation": solo las zonas que aparecen."""
+    return " · ".join(f"{z.emoji} {z.label}" for z in _zones_present(code, tables))
 
 
 def _group_name(group: str | None) -> str:

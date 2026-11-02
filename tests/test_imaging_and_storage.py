@@ -155,6 +155,23 @@ async def test_save_game_stores_answers(db: Database) -> None:
     assert [(r["user_id"], r["points"], r["correct"]) for r in rows] == [(100, 75, 1)]
 
 
+async def test_loader_downloads_once_when_asked_twice_at_the_same_time(tmp_path: Path) -> None:
+    import asyncio
+
+    calls = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        await asyncio.sleep(0.05)  # que las dos peticiones se crucen
+        return httpx.Response(200, content=b"png", headers={"content-type": "image/png"})
+
+    loader = ImageLoader(tmp_path, transport=httpx.MockTransport(handler))
+    a, b = await asyncio.gather(loader.get("https://x/1.png"), loader.get("https://x/1.png"))
+    await loader.aclose()
+    assert a == b == b"png"
+    assert len(calls) == 1
+
+
 async def test_last_seen_and_mark_seen(db: Database) -> None:
     yesterday = datetime.now(UTC) - timedelta(days=1)
     await repos.mark_seen(db, 1, ["team-86", "team-81"], when=yesterday)

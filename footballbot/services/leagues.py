@@ -73,6 +73,14 @@ class Zone:
 # Colores de las zonas (los mismos en todas las ligas para que se entiendan de un vistazo)
 UCL, UEL, UECL = "🔵", "🟠", "🟢"
 PLAYOFF, DOWN, NONE = "🟡", "🔴", "⚪"
+# Los mismos colores en RGB para las tarjetas de imagen (imaging/cards.py)
+ZONE_RGB: dict[str, tuple[int, int, int]] = {
+    UCL: (66, 133, 244),
+    UEL: (255, 152, 0),
+    UECL: (52, 199, 89),
+    PLAYOFF: (255, 204, 0),
+    DOWN: (234, 67, 53),
+}
 
 # Zonas por liga. Son las habituales de cada competición: pueden cambiar un poco cada
 # temporada (por ejemplo, si el campeón de copa ya está clasificado). Para cambiarlas, edita aquí.

@@ -9,6 +9,7 @@ Las imágenes de crests.football-data.org no gastan cuota de la API.
 import asyncio
 import hashlib
 import logging
+import uuid
 from pathlib import Path
 
 import httpx
@@ -35,6 +36,9 @@ class ImageLoader:
             headers={"User-Agent": "FootballBot (Discord trivia bot)"},
             transport=transport,
         )
+        # Descargas en curso: si dos partes del bot piden la misma imagen a la vez,
+        # la segunda espera a la primera en vez de bajarla otra vez
+        self._downloading: dict[str, asyncio.Future[bytes]] = {}
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -46,6 +50,14 @@ class ImageLoader:
         if path.exists():
             return await asyncio.to_thread(path.read_bytes)
 
+        pending = self._downloading.get(url)
+        if pending is None:
+            pending = asyncio.ensure_future(self._download(url, path))
+            self._downloading[url] = pending
+            pending.add_done_callback(lambda _: self._downloading.pop(url, None))
+        return await pending
+
+    async def _download(self, url: str, path: Path) -> bytes:
         try:
             response = await self._client.get(url)
         except httpx.HTTPError as e:
@@ -62,6 +74,7 @@ class ImageLoader:
     def _save(path: Path, data: bytes) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         # Se escribe a un archivo temporal y luego se renombra: así nunca queda una imagen a medias
-        tmp = path.with_suffix(".tmp")
+        # Nombre único: dos descargas a la vez nunca escriben el mismo archivo temporal
+        tmp = path.with_name(f"{path.stem}.{uuid.uuid4().hex}.tmp")
         tmp.write_bytes(data)
         tmp.replace(path)

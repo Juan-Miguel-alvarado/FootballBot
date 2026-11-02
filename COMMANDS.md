@@ -16,8 +16,8 @@ The **Image** column describes the image the command produces or uses.
 |---|---|---|---|
 | `/matches [league] [date]` | Today's matches (or a given date) grouped by league | Crests in the embed | MVP |
 | `/live [league]` | Matches in progress with score (the free plan does not give the minute) | Crests | MVP |
-| `/standings <league>` | League table with the leader on top and a color per zone (🔵 Champions, 🟠 Europa, 🟢 Conference, 🟡 playoff, 🔴 relegation) | Text table with zone emojis and the league's color; **generated card** with crests in Phase 4 | MVP |
-| `/team <name>` | Profile: crest, country, stadium, coach, founded, colors, recent form, last and next match | Crest + form as 🟩🟨🟥 (generated strip later) | MVP |
+| `/standings <league>` | League table with the leader on top and a color per zone (🔵 Champions, 🟠 Europa, 🟢 Conference, 🟡 playoff, 🔴 relegation) | **Generated card**: league header, crests, a color stripe per zone and the legend (text table as a fallback) | MVP |
+| `/team <name>` | Profile: crest, country, stadium, coach, founded, colors, recent form, last and next match | **Generated card** in the club's color: big crest, W/D/L form boxes and the next match as a "versus" (text embed as a fallback) | MVP |
 | `/scorers <league>` | Top 10 scorers | Card with player photos | v2 |
 | `/assists <league>` | Top 10 assists | Same as scorers | v2 |
 | `/player <name>` | Profile: photo, club, position, age, season stats | Photo + nationality flag | v2 |
