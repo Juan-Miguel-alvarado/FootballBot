@@ -27,6 +27,8 @@ from discord.ext import commands
 from footballbot.bot import FootballBot
 from footballbot.cogs.common import COLOR
 from footballbot.errors import UserFacingError
+from footballbot.imaging import trivia_cards
+from footballbot.imaging.draw import hex_rgb
 from footballbot.imaging.effects import render_stage
 from footballbot.imaging.loader import ImageDownloadError
 from footballbot.models import Question, TriviaItem
@@ -49,6 +51,7 @@ MAX_ROUNDS = 20
 MAX_IMAGE_ATTEMPTS = 3
 
 MEDALS = ("🥇", "🥈", "🥉")
+LEADERBOARD_ACCENT = (255, 196, 0)  # dorado
 
 _MODE_CHOICES = [app_commands.Choice(name=m.title, value=m.key) for m in MODES.values()]
 
@@ -63,6 +66,9 @@ class Trivia(commands.Cog):
         self.bot = bot
         self.dataset: TriviaDataset | None = None
         self.games: dict[int, GameSession] = {}  # id del canal -> partida en curso
+        # id del canal -> {id de usuario: usuario} de quienes respondieron en esa partida.
+        # Sirve para poner nombres y avatares en la respuesta y en el podio.
+        self.players: dict[int, dict[int, discord.abc.User]] = {}
         # Guardamos las tareas para que Python no las borre mientras corren
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -135,6 +141,7 @@ class Trivia(commands.Cog):
             answer_mode=answer_mode,
         )
         self.games[channel.id] = session
+        self.players[channel.id] = {}
         await interaction.response.send_message(embed=_start_embed(session, interaction.user))
 
         task = asyncio.create_task(self._run_game(session, picker, channel))
@@ -164,9 +171,11 @@ class Trivia(commands.Cog):
     async def leaderboard(
         self, interaction: discord.Interaction, mode: app_commands.Choice[str] | None = None
     ) -> None:
-        assert interaction.guild_id is not None  # guild_only
+        assert interaction.guild is not None  # guild_only
+        # Bajar los avatares tarda un poco: "thinking..." mientras tanto
+        await interaction.response.defer()
         rows = await repos.leaderboard(
-            self.bot.db, interaction.guild_id, mode.value if mode else None
+            self.bot.db, interaction.guild.id, mode.value if mode else None
         )
         title = "🏆 Trivia leaderboard"
         if mode:
@@ -181,7 +190,52 @@ class Trivia(commands.Cog):
             )
         else:
             embed.description = "No games yet. Start one with `/trivia start`."
-        await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
+            return
+
+        # Tarjeta con avatares (issue #11); si falla, queda el texto de arriba
+        file = None
+        try:
+            people = await asyncio.gather(
+                *(self._resolve_user(interaction.guild, r.user_id) for r in rows)
+            )
+            players = [
+                trivia_cards.PlayerEntry(
+                    name=name,
+                    avatar=picture,
+                    points=r.points,
+                    detail=f"{r.correct} correct · {r.played} "
+                    f"{'game' if r.played == 1 else 'games'} · best streak {r.best_streak}",
+                )
+                for r, (name, picture) in zip(rows, people, strict=True)
+            ]
+            subtitle = f"{MODES[mode.value].title if mode else 'All modes'} · "
+            subtitle += interaction.guild.name
+            png = await asyncio.to_thread(
+                trivia_cards.leaderboard_card,
+                title="Trivia leaderboard",
+                subtitle=subtitle,
+                accent=LEADERBOARD_ACCENT,
+                players=players,
+            )
+            file = discord.File(io.BytesIO(png), filename="leaderboard.png")
+            embed.set_image(url="attachment://leaderboard.png")
+        except Exception:
+            log.exception("Could not draw the leaderboard card")
+        await interaction.followup.send(embed=embed, **({"file": file} if file else {}))
+
+    async def _resolve_user(self, guild: discord.Guild, user_id: int) -> tuple[str, bytes | None]:
+        """Nombre y avatar de un jugador (aunque ya no esté en el servidor)."""
+        user: discord.abc.User | None = guild.get_member(user_id) or self.bot.get_user(user_id)
+        if user is None:
+            try:
+                user = await guild.fetch_member(user_id)
+            except discord.HTTPException:
+                try:
+                    user = await self.bot.fetch_user(user_id)
+                except discord.HTTPException:
+                    return "Unknown player", None
+        return user.display_name, await _avatar_bytes(user)
 
     # --- respuestas escritas ---------------------------------------------------------------
 
@@ -193,6 +247,7 @@ class Trivia(commands.Cog):
         session = self.games.get(message.channel.id)
         if session is None or session.answer_mode is not AnswerMode.TYPED:
             return
+        self.players.setdefault(message.channel.id, {})[message.author.id] = message.author
         outcome, _ = session.answer(message.author.id, text=message.content)
         if outcome is Outcome.CORRECT:
             # Sin permiso de reaccionar no pasa nada: el mensaje de la ronda ya dice quién ganó
@@ -238,13 +293,16 @@ class Trivia(commands.Cog):
         channel: discord.abc.Messageable,
     ) -> None:
         session.start_round(question)
-        view = AnswerView(session, question) if session.answer_mode is AnswerMode.BUTTONS else None
+        players = self.players.setdefault(session.channel_id, {})
+        view = (
+            AnswerView(session, question, players)
+            if session.answer_mode is AnswerMode.BUTTONS
+            else None
+        )
 
         message: discord.Message | None = None
         while True:
-            png = await asyncio.to_thread(
-                render_stage, crest, session.mode.effect, session.mode.levels[session.stage]
-            )
+            png = await asyncio.to_thread(_round_png, crest, session)
             file = _image_file(png, session)
             embed = _round_embed(session)
             if message is None:
@@ -262,7 +320,10 @@ class Trivia(commands.Cog):
 
         if session.round_open:
             session.close_round()
-        png = await asyncio.to_thread(render_stage, crest, session.mode.effect, None)
+        winner = players.get(session.winner) if session.winner is not None else None
+        png = await asyncio.to_thread(
+            _reveal_png, crest, session, winner.display_name if winner else None
+        )
         kwargs = {"view": view.reveal()} if view else {}
         await _edit_quietly(
             message,
@@ -287,17 +348,52 @@ class Trivia(commands.Cog):
             except Exception as e:
                 log.exception("Could not save trivia game")
                 await self.bot.report_error("Saving a trivia game", e)
-        await _send_quietly(channel, embed=_summary_embed(session))
+        embed = _summary_embed(session)
+        file = None
+        if ranking := session.ranking():
+            # Podio con avatares (issue #11); si falla, queda el resumen en texto
+            try:
+                known = self.players.get(session.channel_id, {})
+                players = []
+                for score in ranking[:10]:
+                    user = known.get(score.user_id)
+                    players.append(
+                        trivia_cards.PlayerEntry(
+                            name=user.display_name if user else "Player",
+                            avatar=await _avatar_bytes(user) if user else None,
+                            points=score.points,
+                        )
+                    )
+                png = await asyncio.to_thread(
+                    trivia_cards.podium_card,
+                    title="Game over",
+                    subtitle=f"{session.mode.title} · {session.round} rounds · "
+                    f"{session.difficulty}",
+                    accent=hex_rgb(session.mode.color),
+                    players=players,
+                )
+                file = discord.File(io.BytesIO(png), filename="podium.png")
+                embed.set_image(url="attachment://podium.png")
+            except Exception:
+                log.exception("Could not draw the podium card")
+        self.players.pop(session.channel_id, None)
+        await _send_quietly(channel, embed=embed, **({"file": file} if file else {}))
 
 
 class AnswerView(discord.ui.View):
     """Los 4 botones de una ronda. Cada clic llama a `session.answer` y responde solo a quien
     hizo clic (ephemeral), para no llenar el chat."""
 
-    def __init__(self, session: GameSession, question: Question) -> None:
+    def __init__(
+        self,
+        session: GameSession,
+        question: Question,
+        players: dict[int, discord.abc.User],
+    ) -> None:
         super().__init__(timeout=None)  # el bucle de la ronda decide cuándo se acaba
         self.session = session
         self.question = question
+        self.players = players  # se anota quién responde, para nombres y avatares
         self._buttons: list[tuple[discord.ui.Button[AnswerView], TriviaItem]] = []
         for option in question.options:
             button: discord.ui.Button[AnswerView] = discord.ui.Button(
@@ -311,6 +407,7 @@ class AnswerView(discord.ui.View):
         self, option: TriviaItem
     ) -> Callable[[discord.Interaction], Coroutine[Any, Any, None]]:
         async def callback(interaction: discord.Interaction) -> None:
+            self.players[interaction.user.id] = interaction.user
             outcome, points = self.session.answer(interaction.user.id, choice_id=option.id)
             await interaction.response.send_message(_outcome_text(outcome, points), ephemeral=True)
 
@@ -364,6 +461,56 @@ async def _edit_quietly(message: discord.Message, **kwargs: Any) -> None:
         log.warning("Could not edit a trivia message", exc_info=True)
 
 
+def _round_png(crest: bytes, session: GameSession) -> bytes:
+    """La ronda como tarjeta. Si la tarjeta falla, solo la imagen con el efecto (como antes)."""
+    stage_image = render_stage(crest, session.mode.effect, session.mode.levels[session.stage])
+    try:
+        return trivia_cards.round_card(
+            stage_image=stage_image,
+            round_no=session.round,
+            total_rounds=session.total_rounds,
+            title=session.mode.title,
+            accent=hex_rgb(session.mode.color),
+            stage=session.stage,
+            points=STAGE_POINTS,
+        )
+    except Exception:
+        log.exception("Could not draw the round card")
+        return stage_image
+
+
+def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> bytes:
+    """La respuesta como tarjeta. Si falla, solo el escudo limpio (como antes)."""
+    assert session.question is not None
+    answer = session.question.answer
+    if session.winner is not None:
+        points = session.answers[-1].points
+        headline, success = f"{winner_name or 'Someone'} got it  +{points}", True
+    else:
+        headline = "Game stopped" if session.stopped else "Nobody got it"
+        success = False
+    try:
+        return trivia_cards.reveal_card(
+            crest=crest,
+            name=answer.name,
+            subtitle=answer.subtitle,
+            accent=hex_rgb(session.mode.color),
+            headline=headline,
+            success=success,
+        )
+    except Exception:
+        log.exception("Could not draw the reveal card")
+        return render_stage(crest, session.mode.effect, None)
+
+
+async def _avatar_bytes(user: discord.abc.User) -> bytes | None:
+    """El avatar de Discord en 128 px, o None si no se pudo bajar."""
+    try:
+        return await user.display_avatar.with_size(128).read()
+    except discord.DiscordException:
+        return None
+
+
 def _image_file(png: bytes, session: GameSession, suffix: str | None = None) -> discord.File:
     # Un nombre distinto por etapa: si se repite, Discord a veces muestra la imagen anterior
     name = f"trivia-{session.round}-{suffix or session.stage}.png"
@@ -410,10 +557,13 @@ def _round_embed(session: GameSession) -> discord.Embed:
         if session.answer_mode is AnswerMode.BUTTONS
         else "Type the answer in the chat."
     )
+    # Barra de tiempo: un cuadro verde por cada etapa que queda
+    left = session.stages - session.stage
+    time_bar = "⏱️ " + "🟩" * left + "⬛" * session.stage
     embed = discord.Embed(
         title=f"Round {session.round}/{session.total_rounds} · {session.mode.prompt}",
-        description=how,
-        color=COLOR,
+        description=f"{how}\n{time_bar}",
+        color=discord.Color(session.mode.color),
     )
     embed.set_image(url=f"attachment://trivia-{session.round}-{session.stage}.png")
     embed.set_footer(

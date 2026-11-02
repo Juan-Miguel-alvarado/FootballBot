@@ -58,6 +58,9 @@ def _read(path: Path) -> list[dict]:
 def _team_item(team: dict, alias: dict | None) -> TriviaItem:
     display = alias["name"] if alias else team["short_name"]
     names = [team["name"], team["short_name"], display, *(alias["aliases"] if alias else ())]
+    # La primera liga de la lista es la del país (el script recorre LEAGUES en orden)
+    main_league = get_league(team["leagues"][0]) if team.get("leagues") else None
+    subtitle = " · ".join(p for p in (team["country"], main_league and main_league.name) if p)
     return TriviaItem(
         id=f"team-{team['id']}",
         name=display,
@@ -66,6 +69,7 @@ def _team_item(team: dict, alias: dict | None) -> TriviaItem:
         image_url=team["crest_url"],
         difficulty=team["difficulty"],
         country=team["country"],
+        subtitle=subtitle or None,
     )
 
 
@@ -81,6 +85,7 @@ def _league_item(league: dict) -> TriviaItem:
         image_url=league["emblem_url"],
         difficulty=1,
         country=league["area"],
+        subtitle=league["area"],
     )
 
 

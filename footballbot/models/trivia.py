@@ -19,6 +19,7 @@ class TriviaItem:
     image_url: str  # escudo o logo en PNG
     difficulty: int  # 1 fácil, 2 media, 3 difícil
     country: str | None = None  # para elegir opciones falsas parecidas (mismo país)
+    subtitle: str | None = None  # se muestra al revelar: "Spain · La Liga"
 
 
 @dataclass(frozen=True, slots=True)
