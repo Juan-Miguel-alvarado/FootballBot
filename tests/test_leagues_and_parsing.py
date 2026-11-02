@@ -123,7 +123,7 @@ def test_standings_table_has_zone_emojis_and_legend() -> None:
     assert lines[2].startswith("🔵  1 Man City")
     assert lines[-2].startswith("🔴 20 ")
     assert _zone_legend("PL", [table]).startswith("🔵 Champions League")
-    assert _leader_line(table).startswith("👑 **Man City** · 21 pts")
+    assert _leader_line(table).startswith("Leader: **Man City** · 21 pts")
 
 
 # --- /matches, /live, /leagues y /ping más bonitos (issue #13) --------------------------------
@@ -178,12 +178,15 @@ def test_leagues_by_region() -> None:
     from footballbot.cogs.info import _leagues_by_region
 
     regions = dict(_leagues_by_region())
-    assert {lg.code for lg in regions["🏆 International"]} == {"CL", "WC", "EC"}
-    assert {lg.code for lg in regions["🌎 South America"]} == {"BSA", "CLI"}
+    assert {lg.code for lg in regions["International"]} == {"CL", "WC", "EC"}
+    assert {lg.code for lg in regions["South America"]} == {"BSA", "CLI"}
     assert sum(len(v) for v in regions.values()) == 13
 
 
 def test_ping_colors() -> None:
-    from footballbot.cogs.admin import _latency_dot
+    from footballbot.cogs.admin import _latency_color
+    from footballbot.cogs.common import COLOR
 
-    assert [_latency_dot(ms) for ms in (50, 200, 900)] == ["🟢", "🟡", "🔴"]
+    fast, normal, slow = (_latency_color(ms) for ms in (50, 200, 900))
+    assert fast == COLOR  # rápido: el azul del logo
+    assert len({fast.value, normal.value, slow.value}) == 3

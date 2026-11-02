@@ -60,10 +60,11 @@ footballbot/
 ├── imaging/                 ── IMÁGENES ──
 │   ├── loader.py            Descarga escudos y los guarda en data/cache/img/
 │   ├── effects.py           Pixelar y desenfocar (funciones puras con Pillow)
-│   ├── draw.py              Estilo de las tarjetas: fuentes, colores, degradados, texto
+│   ├── draw.py              Estilo de las tarjetas: paleta del logo, fuentes, piezas del logo
 │   ├── cards.py             Tarjetas en imagen: tabla de posiciones y perfil de equipo
 │   ├── trivia_cards.py      Tarjetas de la trivia: ronda, respuesta, podio y ranking
-│   └── fonts/               Inter (texto) y Oswald (títulos), fuentes libres (OFL)
+│   ├── fonts/               Inter (texto) y Oswald (títulos), fuentes libres (OFL)
+│   └── assets/logo.png      El logo del bot: se usa como marca y decoración en las tarjetas
 │
 ├── storage/                 ── BASE DE DATOS (SQLite) ──
 │   ├── db.py                Conexión y migraciones
@@ -164,7 +165,8 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | **Un comando nuevo** | Copia `leagues` (simple) o `standings` (con API) en [cogs/info.py](footballbot/cogs/info.py). Si necesita datos, añade un método en [services/football.py](footballbot/services/football.py). Anótalo en [COMMANDS.md](COMMANDS.md) |
 | **Un archivo de comandos nuevo** (ej. `trivia.py`) | Créalo en `cogs/` con una función `setup(bot)` al final (copia la de [admin.py](footballbot/cogs/admin.py)) y añádelo a `EXTENSIONS` en [bot.py](footballbot/bot.py) |
 | **Cambiar cómo se ve un comando** | Las funciones `_match_line`, `_table_block`, `_team_embed` al final de [cogs/info.py](footballbot/cogs/info.py) |
-| **El estilo de las tarjetas** (colores, fuentes, fondo) | Arriba de [imaging/draw.py](footballbot/imaging/draw.py). La distribución de cada tarjeta, en [imaging/cards.py](footballbot/imaging/cards.py) |
+| **El estilo de las tarjetas** (colores, fuentes, logo) | Arriba de [imaging/draw.py](footballbot/imaging/draw.py): la paleta sale del logo (negro y azul `#0B96FE`). La distribución de cada tarjeta, en [imaging/cards.py](footballbot/imaging/cards.py) y [imaging/trivia_cards.py](footballbot/imaging/trivia_cards.py). Regla del estilo: fondo negro plano, esquinas rectas, un solo azul y el logo como marca |
+| **El color de los mensajes de texto** | `COLOR` en [cogs/common.py](footballbot/cogs/common.py) (el azul del logo) y `branded()` para el logo en el pie |
 | **Las zonas o el color de una liga en `/standings`** (puestos de Champions, descenso...) | `ZONES` y `COLORS` en [services/leagues.py](footballbot/services/leagues.py) |
 | **Añadir una liga o un apodo** | `LEAGUES` en [services/leagues.py](footballbot/services/leagues.py) |
 | **Un endpoint nuevo de football-data** | Un método en [providers/football_data.py](footballbot/providers/football_data.py) (copia `team()`), y si es nuevo en el Protocol, en [providers/base.py](footballbot/providers/base.py) |

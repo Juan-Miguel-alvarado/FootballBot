@@ -1,7 +1,11 @@
-"""Herramientas de dibujo para las tarjetas (cards.py): fuentes, colores, degradados, texto.
+"""Herramientas de dibujo para las tarjetas: fuentes, colores, logo, texto.
 
-Funciones puras con Pillow: no descargan nada. Todo el "estilo" (colores, fuentes) está aquí
-arriba, en un solo lugar: si quieres cambiar el look de todas las tarjetas, empieza por aquí.
+Funciones puras con Pillow: no descargan nada. Todo el "estilo" (colores, fuentes, logo) está
+aquí arriba, en un solo lugar: si quieres cambiar el look de todas las tarjetas, empieza aquí.
+
+Estilo "Fragmentos azules" (el del logo del bot, assets/logo.png): fondo negro plano, un solo
+azul eléctrico, esquinas rectas, el logo como marca y sus fragmentos como decoración.
+Sin degradados de fondo, sin sombras y sin píldoras redondeadas.
 
 Fuentes (carpeta fonts/, licencia OFL = libres de usar y redistribuir):
 - Inter: el texto normal y los números.
@@ -10,6 +14,7 @@ Las dos son "variables": un solo archivo trae todos los pesos (Regular, SemiBold
 """
 
 import io
+import math
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,19 +22,21 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 FONTS_DIR = Path(__file__).resolve().parent / "fonts"
 FONT_FILES = {"text": "Inter.ttf", "title": "Oswald.ttf"}
+LOGO_FILE = Path(__file__).resolve().parent / "assets" / "logo.png"
 
 RGB = tuple[int, int, int]
 
-# --- paleta (tema oscuro) ----------------------------------------------------------------------
-BG_TOP: RGB = (24, 28, 38)
-BG_BOTTOM: RGB = (12, 14, 20)
-ROW_A: RGB = (30, 35, 47)
-ROW_B: RGB = (25, 29, 40)
-TEXT: RGB = (240, 242, 247)
-MUTED: RGB = (150, 158, 175)
-WIN: RGB = (52, 199, 89)
-DRAW: RGB = (255, 204, 0)
-LOSS: RGB = (234, 67, 53)
+# --- paleta (sacada del logo del bot) ----------------------------------------------------------
+BLACK: RGB = (0, 0, 0)  # el fondo del logo: así el logo se pega sin recuadro
+PANEL: RGB = (11, 14, 20)  # filas y paneles, apenas más claros que el fondo
+LINE: RGB = (28, 36, 50)  # líneas finas y bordes apagados
+BLUE: RGB = (11, 150, 254)  # el azul claro del balón (#0B96FE)
+BLUE_DEEP: RGB = (3, 98, 255)  # el azul profundo del balón (#0362FF)
+TEXT: RGB = (242, 245, 250)
+MUTED: RGB = (125, 136, 153)
+WIN: RGB = BLUE
+DRAW: RGB = (90, 99, 116)
+LOSS: RGB = (214, 69, 69)  # rojo apagado: solo para perder y descender
 
 
 @lru_cache(maxsize=64)
@@ -43,45 +50,6 @@ def font(kind: str, size: int, weight: str = "Regular") -> ImageFont.FreeTypeFon
 def hex_rgb(value: int) -> RGB:
     """0x3D195B -> (61, 25, 91)."""
     return ((value >> 16) & 255, (value >> 8) & 255, value & 255)
-
-
-def mix(a: RGB, b: RGB, amount: float) -> RGB:
-    """Mezcla dos colores: amount=0 da `a`, amount=1 da `b`."""
-    return tuple(round(x + (y - x) * amount) for x, y in zip(a, b, strict=True))  # type: ignore[return-value]
-
-
-def readable_on(color: RGB) -> RGB:
-    """Texto blanco o casi negro según qué se lee mejor sobre `color`."""
-    luminance = 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
-    return (20, 22, 28) if luminance > 160 else TEXT
-
-
-def vertical_gradient(size: tuple[int, int], top: RGB, bottom: RGB) -> Image.Image:
-    """Fondo con degradado de arriba hacia abajo."""
-    height = size[1]
-    column = Image.new("RGB", (1, height))
-    for y in range(height):
-        column.putpixel((0, y), mix(top, bottom, y / max(1, height - 1)))
-    return column.resize(size)
-
-
-def accent_band(size: tuple[int, int], accent: RGB) -> Image.Image:
-    """Banda de cabecera: el color de acento a la izquierda que se funde con el fondo."""
-    width = size[0]
-    row = Image.new("RGB", (width, 1))
-    for x in range(width):
-        row.putpixel((x, 0), mix(mix(accent, BG_TOP, 0.25), BG_TOP, min(1.0, x / (width * 0.9))))
-    return row.resize(size)
-
-
-def fade_mask(size: tuple[int, int], start: float = 0.5) -> Image.Image:
-    """Máscara de transparencia: opaca arriba y se desvanece desde `start` (0-1) hasta abajo."""
-    height = size[1]
-    column = Image.new("L", (1, height))
-    for y in range(height):
-        t = y / max(1, height - 1)
-        column.putpixel((0, y), 255 if t < start else round(255 * (1 - (t - start) / (1 - start))))
-    return column.resize(size)
 
 
 def fit_font(
@@ -137,63 +105,10 @@ def paste_icon(
     canvas.paste(icon, (x, y), icon)
 
 
-def pill(
-    draw: ImageDraw.ImageDraw,
-    box: tuple[int, int, int, int],
-    fill: RGB,
-    text: str = "",
-    fnt: ImageFont.FreeTypeFont | None = None,
-) -> None:
-    """Rectángulo con puntas redondas ("chip"), con texto centrado opcional."""
-    radius = (box[3] - box[1]) // 2
-    draw.rounded_rectangle(box, radius=radius, fill=fill)
-    if text and fnt:
-        center = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
-        draw.text(center, text, font=fnt, fill=readable_on(fill), anchor="mm")
-
-
 def to_png(image: Image.Image) -> bytes:
     output = io.BytesIO()
     image.convert("RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()
-
-
-# Colores con los que la API describe a los clubes ("White / Purple", "Red / Navy Blue")
-COLOR_NAMES: dict[str, RGB] = {
-    "red": (210, 35, 42), "claret": (122, 38, 58), "maroon": (128, 0, 32),
-    "burgundy": (128, 0, 32), "blue": (30, 90, 200), "navy": (20, 40, 100),
-    "navy blue": (20, 40, 100), "royal blue": (30, 70, 190), "sky blue": (108, 171, 221),
-    "dark blue": (0, 45, 120), "blue-white": (30, 90, 200),
-    "dark red": (140, 20, 30), "light green": (90, 190, 90), "pink": (230, 120, 170),
-    "cyan": (0, 170, 200), "turquoise": (0, 170, 170), "lime": (150, 210, 40),
-    "light blue": (108, 171, 221), "green": (0, 140, 70), "dark green": (0, 90, 50),
-    "yellow": (250, 210, 0), "gold": (212, 175, 55), "orange": (245, 130, 32),
-    "purple": (110, 50, 160), "violet": (110, 50, 160), "black": (40, 40, 40),
-    "grey": (130, 130, 130), "gray": (130, 130, 130), "silver": (170, 170, 170),
-    "white": (235, 235, 235), "amber": (255, 191, 0), "brown": (120, 72, 40),
-}  # fmt: skip
-NEUTRAL = {"white", "black", "grey", "gray", "silver"}
-NEUTRAL_ACCENT: RGB = (85, 90, 105)
-
-
-def color_from_names(colors: str | None, default: RGB = WIN) -> RGB:
-    """El color del club a partir de "White / Purple": el primero que no sea blanco/negro/gris."""
-    if not colors:
-        return default
-    names = [c.strip().lower() for c in colors.replace("-", "/").split("/")]
-    known = [n for n in names if n in COLOR_NAMES]
-    for name in known:
-        if name not in NEUTRAL:
-            return COLOR_NAMES[name]
-    # Solo blanco/negro/gris (Juventus, Newcastle...): un gris oscuro, para que el texto se lea
-    return NEUTRAL_ACCENT if known else default
-
-
-# Medallas del podio y del ranking
-GOLD: RGB = (255, 196, 0)
-SILVER: RGB = (192, 198, 210)
-BRONZE: RGB = (205, 127, 50)
-MEDALS: tuple[RGB, ...] = (GOLD, SILVER, BRONZE)
 
 
 def avatar(
@@ -223,3 +138,109 @@ def avatar(
         )  # fmt: skip
     picture.putalpha(mask)
     return picture
+
+
+# --- el logo del bot ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _logo_rgba() -> Image.Image:
+    """El logo con el negro convertido en transparencia (para pegarlo sobre cualquier fondo).
+
+    El logo es azul sobre negro: lo oscuro pasa a transparente y lo azul queda opaco, con los
+    bordes suaves.
+    """
+    source = Image.open(LOGO_FILE).convert("RGB")
+    alpha = source.convert("L").point(lambda v: min(255, v * 3))
+    logo = source.convert("RGBA")
+    logo.putalpha(alpha)
+    return logo.crop(logo.getbbox())
+
+
+def logo(size: int, opacity: float = 1.0) -> Image.Image:
+    """El logo (balón + fragmentos) de `size` px de ancho, con fondo transparente."""
+    image = _logo_rgba()
+    height = round(image.height * size / image.width)
+    image = image.resize((size, height), Image.Resampling.LANCZOS)
+    if opacity < 1:
+        image.putalpha(image.getchannel("A").point(lambda a: round(a * opacity)))
+    return image
+
+
+def shards(width: int, opacity: float = 1.0) -> Image.Image:
+    """Solo los fragmentos que salen volando del balón, recortados del logo."""
+    image = _logo_rgba()
+    # Los fragmentos están en la parte derecha del logo
+    crop = image.crop((round(image.width * 0.6), 0, image.width, image.height))
+    crop = crop.crop(crop.getbbox())
+    height = round(crop.height * width / crop.width)
+    crop = crop.resize((width, height), Image.Resampling.LANCZOS)
+    if opacity < 1:
+        crop.putalpha(crop.getchannel("A").point(lambda a: round(a * opacity)))
+    return crop
+
+
+def paste(canvas: Image.Image, image: Image.Image, xy: tuple[int, int]) -> None:
+    """Pega una imagen con transparencia (se puede salir del borde: se recorta sola)."""
+    canvas.alpha_composite(image, dest=(max(0, xy[0]), max(0, xy[1])),
+                           source=(max(0, -xy[0]), max(0, -xy[1])))  # fmt: skip
+
+
+def hex_texture(canvas: Image.Image, box: tuple[int, int, int, int], size: int = 34) -> None:
+    """Hexágonos del balón, muy tenues, dentro de `box` (textura de fondo)."""
+    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    w = math.sqrt(3) * size
+    row = 0
+    y = box[1]
+    while y < box[3] + size:
+        x = box[0] + (w / 2 if row % 2 else 0)
+        while x < box[2] + w:
+            points = [
+                (x + size * math.cos(math.radians(60 * i + 30)),
+                 y + size * math.sin(math.radians(60 * i + 30)))
+                for i in range(6)
+            ]  # fmt: skip
+            draw.polygon(points, outline=(*BLUE, 26))
+            x += w
+        y += size * 1.5
+        row += 1
+    mask = Image.new("L", canvas.size, 0)
+    ImageDraw.Draw(mask).rectangle(box, fill=255)
+    layer.putalpha(Image.composite(layer.getchannel("A"), mask, mask))
+    canvas.alpha_composite(layer)
+
+
+def brand(canvas: Image.Image, right: int, top: int, size: int = 64) -> None:
+    """El logo pequeño, como marca de canal de TV, con su borde derecho en `right`."""
+    mark = logo(size)
+    paste(canvas, mark, (right - mark.width, top))
+
+
+def tile(
+    canvas: Image.Image,
+    data: bytes | None,
+    box: tuple[int, int, int, int],
+    border: RGB | None = None,
+    fill: RGB = (236, 239, 244),
+) -> None:
+    """Escudo o logo sobre un cuadro claro de esquinas rectas (se ven también los oscuros)."""
+    draw = ImageDraw.Draw(canvas)
+    if border:
+        draw.rectangle((box[0] - 3, box[1] - 3, box[2] + 3, box[3] + 3), fill=border)
+    draw.rectangle(box, fill=fill)
+    side = min(box[2] - box[0], box[3] - box[1])
+    icon = load_icon(data, round(side * 0.82))
+    paste_icon(canvas, icon, ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2))
+
+
+def wordmark(draw: ImageDraw.ImageDraw, xy: tuple[int, int], anchor: str = "ls") -> None:
+    """ "FOOTBALLTRIVIA" en pequeño, con FOOTBALL en blanco y TRIVIA en azul."""
+    fnt = font("title", 18, "SemiBold")
+    x, y = xy
+    first, second = "FOOTBALL", "TRIVIA"
+    width = fnt.getlength(first + second)
+    if anchor.startswith("r"):
+        x -= width
+    draw.text((x, y), first, font=fnt, fill=TEXT, anchor="l" + anchor[1])
+    draw.text((x + fnt.getlength(first), y), second, font=fnt, fill=BLUE, anchor="l" + anchor[1])

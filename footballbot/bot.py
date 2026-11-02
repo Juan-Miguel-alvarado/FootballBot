@@ -47,7 +47,7 @@ EXTENSIONS = (
 # Discord messages are capped at 2000 characters
 MAX_TRACEBACK = 1800
 # Color de los mensajes de error
-ERROR_COLOR = discord.Color.from_rgb(234, 67, 53)
+ERROR_COLOR = discord.Color.from_rgb(214, 69, 69)  # rojo apagado, el mismo de las tarjetas
 
 
 class FootballBot(commands.Bot):
@@ -187,8 +187,8 @@ class FootballBot(commands.Bot):
             log.exception("Could not send the error report to channel %s", channel_id)
 
     async def _reply_error(self, interaction: discord.Interaction, message: str) -> None:
-        """Responde el error al usuario en un embed rojo corto. ephemeral=True: solo él lo ve."""
-        embed = discord.Embed(description=f"❌ {message}", color=ERROR_COLOR)
+        """Responde el error al usuario en un embed rojo apagado. ephemeral=True: solo él lo ve."""
+        embed = discord.Embed(description=message, color=ERROR_COLOR)
         try:
             # Si el comando ya hizo defer() (el "FootballTrivia is thinking..."), hay que
             # responder con followup; si no, con response.send_message.

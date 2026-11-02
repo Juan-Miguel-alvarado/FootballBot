@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from footballbot.bot import FootballBot
-from footballbot.cogs.common import COLOR, MAX_CHOICES
+from footballbot.cogs.common import COLOR, MAX_CHOICES, branded
 from footballbot.providers.base import ProviderError
 
 
@@ -28,21 +28,22 @@ class Admin(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         # latency: tiempo de ida y vuelta con Discord, en segundos.
         latency_ms = self.bot.latency * 1000
-        embed = discord.Embed(title="🏓 Pong", color=_latency_color(latency_ms))
-        embed.add_field(name="💬 Discord", value=f"{_latency_dot(latency_ms)} {latency_ms:.0f} ms")
+        embed = discord.Embed(title="Pong", color=_latency_color(latency_ms))
+        embed.add_field(name="Discord", value=f"{latency_ms:.0f} ms")
         try:
             health = await self.bot.football.api_status()
         except ProviderError as e:
-            embed.add_field(name="⚽ football-data.org", value=f"🔴 {e}", inline=False)
-            embed.color = discord.Color.red()
+            embed.add_field(name="football-data.org", value=f"Error: {e}", inline=False)
+            embed.color = discord.Color.from_rgb(214, 69, 69)
         else:
-            parts = ["🟢 OK"]
+            parts = ["OK"]
             if health.last_latency_ms is not None:
                 parts.append(f"{health.last_latency_ms:.0f} ms")
             if health.requests_left is not None:
                 parts.append(f"{health.requests_left} requests left this minute")
-            embed.add_field(name=f"⚽ {health.name}", value=" · ".join(parts), inline=False)
-        embed.add_field(name="🔎 Teams indexed", value=str(self.bot.football.indexed_teams))
+            embed.add_field(name=health.name, value=" · ".join(parts), inline=False)
+        embed.add_field(name="Teams indexed", value=str(self.bot.football.indexed_teams))
+        branded(embed, self.bot)
         # Después de un defer se responde con followup.send (no con response.send_message).
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -66,19 +67,19 @@ class Admin(commands.Cog):
         else:
             # /help: todos los comandos, por categorías (cada cog es una, ver CATEGORIES)
             embed = discord.Embed(
-                title="📖 FootballTrivia commands",
+                title="FootballTrivia commands",
                 description="Football info, crest trivia and more. "
                 "`<required>` `[optional]` · `/help <command>` for details.",
                 color=COLOR,
             )
             by_category: dict[str, list[str]] = {}
             for c in commands_:
-                category = CATEGORIES.get(type(c.binding).__name__, "🛠️ Utilities")
+                category = CATEGORIES.get(type(c.binding).__name__, "Utilities")
                 by_category.setdefault(category, []).append(f"`{_usage(c)}` · {c.description}")
             for category in sorted(by_category, key=_category_order):
                 embed.add_field(name=category, value="\n".join(by_category[category]), inline=False)
             embed.set_footer(text="Try /standings league:PL or /trivia start")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=branded(embed, self.bot), ephemeral=True)
 
     @help.autocomplete("command")
     async def _help_autocomplete(
@@ -96,7 +97,7 @@ class Admin(commands.Cog):
 
 
 # Nombre de la categoría de /help para cada cog (la clase que define los comandos)
-CATEGORIES = {"Info": "⚽ Football", "Trivia": "🧩 Trivia", "Admin": "🛠️ Utilities"}
+CATEGORIES = {"Info": "Football", "Trivia": "Trivia", "Admin": "Utilities"}
 
 
 def _category_order(name: str) -> int:
@@ -104,14 +105,11 @@ def _category_order(name: str) -> int:
     return order.index(name) if name in order else len(order)
 
 
-def _latency_dot(ms: float) -> str:
-    """🟢 rápido, 🟡 normal, 🔴 lento."""
-    return "🟢" if ms < 150 else "🟡" if ms < 400 else "🔴"
-
-
 def _latency_color(ms: float) -> discord.Color:
-    colors = {"🟢": discord.Color.green(), "🟡": discord.Color.gold()}
-    return colors.get(_latency_dot(ms), discord.Color.red())
+    """Color del embed de /ping: azul del logo si va rápido, ámbar si normal, rojo si lento."""
+    if ms < 150:
+        return COLOR
+    return discord.Color.from_rgb(212, 167, 44) if ms < 400 else discord.Color.from_rgb(214, 69, 69)
 
 
 def _usage(command: app_commands.Command) -> str:

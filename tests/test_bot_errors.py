@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from discord import app_commands
 
-from footballbot.bot import FootballBot
+from footballbot.bot import ERROR_COLOR, FootballBot
 from footballbot.config import Settings
 from footballbot.errors import UserFacingError
 from footballbot.providers.base import NotFoundError, NotInPlanError
@@ -49,8 +49,8 @@ async def reply_for(bot: FootballBot, error: Exception) -> str:
     _, kwargs = interaction.response.send_message.call_args
     assert kwargs["ephemeral"] is True  # solo lo ve quien usó el comando
     embed = kwargs["embed"]
-    assert embed.description.startswith("❌ ")  # embed rojo con una ✖
-    return embed.description.removeprefix("❌ ")
+    assert embed.color == ERROR_COLOR  # embed rojo apagado, sin emojis
+    return embed.description
 
 
 async def test_not_in_plan_message(bot: FootballBot) -> None:

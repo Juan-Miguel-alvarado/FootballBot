@@ -84,6 +84,7 @@ FootballBot/
 │   │   ├── cards.py           # cards: standings, team
 │   │   ├── trivia_cards.py    # cards: trivia round, reveal, podium, leaderboard
 │   │   ├── fonts/             # Inter + Oswald (OFL), variable fonts
+│   │   ├── assets/logo.png    # the bot's logo: brand mark, faint watermark and fragments on cards
 │   │   └── loader.py          # download + disk cache
 │   ├── storage/
 │   │   ├── db.py              # SQLite connection + migrations (PRAGMA user_version)

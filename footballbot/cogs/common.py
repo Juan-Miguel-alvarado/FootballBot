@@ -23,7 +23,9 @@ if TYPE_CHECKING:
     from footballbot.bot import FootballBot
 
 # Color de la barra lateral de los embeds (verde)
-COLOR = discord.Color.from_rgb(46, 160, 67)
+# El azul del logo del bot (#0B96FE): la barra lateral de todos los embeds
+COLOR = discord.Color.from_rgb(11, 150, 254)
+BRAND_NAME = "FootballTrivia"
 
 # Discord limits
 MAX_CHOICES = 25  # sugerencias de autocompletado
@@ -110,6 +112,22 @@ def parse_league(value: str | None) -> League | None:
 
 
 # --- embeds ----------------------------------------------------------------------------------
+
+
+def branded(embed: discord.Embed, client: discord.Client) -> discord.Embed:
+    """Pone el logo del bot (su avatar) y "FootballTrivia" en el pie del embed.
+
+    Si el embed ya tenía pie ("Matchday 9"), lo mantiene: "Matchday 9 · FootballTrivia".
+    """
+    user = client.user
+    text = embed.footer.text
+    embed.set_footer(
+        text=f"{text} · {BRAND_NAME}" if text else BRAND_NAME,
+        icon_url=user.display_avatar.url if user else None,
+    )
+    return embed
+
+
 # Un embed es el "recuadro" con título, campos e imagen que muestra Discord.
 
 

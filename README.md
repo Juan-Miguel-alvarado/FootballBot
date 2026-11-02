@@ -6,7 +6,7 @@ A Discord bot about football: **live league information** (matches, standings, t
   <img src="docs/preview.gif" alt="FootballBot preview: trivia rounds, answer cards, podium, standings and team cards" width="560">
 </p>
 
-<sub>The preview shows the real images the bot sends, made with real data by <code>scripts/make_preview.py</code>.</sub>
+<sub>The preview shows the real images the bot sends, made with real data by <code>scripts/make_preview.py</code>. Every card follows the bot's logo: black, one electric blue and the ball's fragments.</sub>
 
 > **Status:** the MVP (Phases 0-2) is done, plus the crest and flag modes of Phase 3 and the image cards of Phase 4. Next: player trivia, alerts and running it 24/7. See [ROADMAP.md](ROADMAP.md).
 
@@ -59,7 +59,7 @@ The full catalog, including what is planned, is in [COMMANDS.md](COMMANDS.md).
 | Main language | **Python 3.12+** |
 | Discord | [`discord.py`](https://discordpy.readthedocs.io/) 2.x (slash commands, buttons, select menus, autocomplete) |
 | HTTP | `httpx` (async) |
-| Images | `Pillow` with the free Inter and Oswald fonts |
+| Images | `Pillow` with the free Inter and Oswald fonts, styled after the bot's logo |
 | Database | SQLite with `aiosqlite` (numbered migrations), PostgreSQL if it grows |
 | Answer matching | `rapidfuzz` + `unidecode` |
 | Config | `.env` + `pydantic-settings` |
