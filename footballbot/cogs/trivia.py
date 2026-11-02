@@ -121,7 +121,9 @@ class Trivia(commands.Cog):
 
         game_mode = MODES[mode.value]
         level = difficulty.value if difficulty else "easy"
-        picker = QuestionPicker(pool_for(game_mode, self.dataset, level))
+        # Lo que ya salió en este servidor, para no repetir escudos entre partidas (issue #9)
+        seen = await repos.last_seen(self.bot.db, guild.id)
+        picker = QuestionPicker(pool_for(game_mode, self.dataset, level), last_seen=seen)
         session = GameSession(
             guild_id=guild.id,
             channel_id=channel.id,
@@ -272,6 +274,13 @@ class Trivia(commands.Cog):
             view.stop()
 
     async def _finish_game(self, session: GameSession, channel: discord.abc.Messageable) -> None:
+        if session.played:
+            # Se anota aunque nadie haya acertado o se haya parado: ya se vio ese escudo
+            try:
+                await repos.mark_seen(self.bot.db, session.guild_id, session.played)
+            except Exception as e:
+                log.exception("Could not save the played trivia answers")
+                await self.bot.report_error("Saving played trivia answers", e)
         if session.answers:
             try:
                 await repos.save_game(self.bot.db, session.result())

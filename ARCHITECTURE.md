@@ -206,7 +206,10 @@ Built in Phase 2 (`storage/migrations/001_init.sql`):
 games         (id, guild_id, channel_id, mode, difficulty, rounds, started_at, ended_at)
 answers       (game_id, user_id, round, correct, stage, points, answered_at)
 scores        (guild_id, user_id, mode, points, correct, answered, played, best_streak)   -- aggregate
+trivia_seen   (guild_id, item_id, last_seen_at)   -- 002: what already came up, so crests don't repeat
 ```
+
+`QuestionPicker` uses `trivia_seen` as a shuffle bag with memory per server: answers that never came up go first (shuffled), then the ones seen longest ago. No crest repeats until every one of that difficulty has come up.
 
 Planned:
 
