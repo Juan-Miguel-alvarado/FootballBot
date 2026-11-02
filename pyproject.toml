@@ -31,7 +31,7 @@ dev = [
 include = ["footballbot*"]
 
 [tool.setuptools.package-data]
-footballbot = ["storage/migrations/*.sql"]
+footballbot = ["storage/migrations/*.sql", "imaging/fonts/*.ttf", "imaging/fonts/*.txt"]
 
 [tool.ruff]
 line-length = 100

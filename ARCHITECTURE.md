@@ -80,8 +80,9 @@ FootballBot/
 │   │   └── flags.py
 │   ├── imaging/
 │   │   ├── effects.py         # pixelate, blur, silhouette, zoom_crop, grayscale
-│   │   ├── cards.py           # cards: standings, versus, profile, career path
-│   │   ├── fonts/             # freely licensed .ttf fonts
+│   │   ├── draw.py            # drawing helpers: fonts, palette, gradients, fitted text, icons
+│   │   ├── cards.py           # cards: standings, team (later: trivia rounds, podium, career path)
+│   │   ├── fonts/             # Inter + Oswald (OFL), variable fonts
 │   │   └── loader.py          # download + disk cache
 │   ├── storage/
 │   │   ├── db.py              # SQLite connection + migrations (PRAGMA user_version)

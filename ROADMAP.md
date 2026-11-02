@@ -102,7 +102,8 @@ Notes from building it:
 
 ## Phase 4 — Advanced info and cards
 
-- [ ] `imaging/cards.py`: **standings** card with crests and zone colors
+- [x] `imaging/cards.py`: **standings** card with crests and zone colors — @Juan-Miguel-alvarado (#10)
+- [x] **Team** card with form boxes and the next match as a versus — @Juan-Miguel-alvarado (#10)
 - [ ] **Versus** card for `/next` and `/last`
 - [ ] `/scorers`, `/assists`, `/player`, `/squad`
 - [ ] `/follow` + `poll_live` task with goal alerts
