@@ -10,19 +10,24 @@ Reglas:
 - Botones: quien falla queda fuera de esa ronda. Escrito: se puede seguir intentando.
 - Racha: rondas seguidas ganadas por el mismo jugador. Desde la segunda suma
   +10 por ronda de racha, hasta +50.
+- Pistas (/trivia hint): hasta 3 por ronda y jugador. Cada una le quita HINT_COST puntos a
+  lo que ese jugador gane en esa ronda (como mínimo gana MIN_POINTS).
 """
 
 import asyncio
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from footballbot.models import AnswerRecord, GameResult, PlayerScore, Question
+from footballbot.models import AnswerRecord, GameResult, PlayerScore, Question, TriviaItem
 from footballbot.services.trivia.matching import is_correct
 from footballbot.services.trivia.modes import Mode
 
 STAGE_POINTS = (100, 75, 50, 25)
 STREAK_BONUS = 10
 MAX_STREAK_BONUS = 50
+HINT_COST = 25
+MAX_HINTS = 3
+MIN_POINTS = 10
 
 
 class AnswerMode(StrEnum):
@@ -67,6 +72,7 @@ class GameSession:
         self.scores: dict[int, PlayerScore] = {}
         self.answers: list[AnswerRecord] = []
         self._tried: set[int] = set()  # quién ya respondió (mal) con botones esta ronda
+        self._hints: dict[int, int] = {}  # cuántas pistas pidió cada jugador esta ronda
         # ids de las respuestas de cada ronda jugada (se guardan para no repetirlas, issue #9)
         self.played: list[str] = []
         # cogs/trivia.py espera este evento: se activa cuando alguien acierta o se para el juego
@@ -86,10 +92,11 @@ class GameSession:
         self.round += 1
         self.stage = 0
         self.question = question
-        self.played.append(question.answer.id)
+        self.played.append(question.subject.id)
         self.winner = None
         self.round_open = True
         self._tried.clear()
+        self._hints.clear()
         self.round_over.clear()
 
     def next_stage(self) -> bool:
@@ -147,7 +154,8 @@ class GameSession:
         score.streak += 1
         score.best_streak = max(score.best_streak, score.streak)
         bonus = min(STREAK_BONUS * (score.streak - 1), MAX_STREAK_BONUS)
-        points = STAGE_POINTS[self.stage] + bonus
+        base = STAGE_POINTS[self.stage] - HINT_COST * self._hints.get(user_id, 0)
+        points = max(MIN_POINTS, base) + bonus
         score.points += points
         score.correct += 1
         score.answered += 1
@@ -155,6 +163,19 @@ class GameSession:
         self.winner = user_id
         self.close_round()
         return Outcome.CORRECT, points
+
+    def hint(self, user_id: int) -> str | None:
+        """La siguiente pista para este jugador en esta ronda, o None si no hay ronda abierta.
+
+        Cada pista que pide le quita HINT_COST puntos a lo que gane en esta ronda.
+        """
+        if not self.round_open or self.question is None:
+            return None
+        used = self._hints.get(user_id, 0)
+        if used >= MAX_HINTS:
+            return "No more hints this round."
+        self._hints[user_id] = used + 1
+        return hint_text(self.question.answer, used)
 
     def _record(self, user_id: int, *, correct: bool, points: int) -> None:
         self.answers.append(
@@ -186,3 +207,29 @@ class GameSession:
             answers=tuple(self.answers),
             players=tuple(self.ranking()),
         )
+
+
+def hint_text(answer: TriviaItem, number: int) -> str:
+    """La pista número `number` (0, 1, 2) de una respuesta, de más vaga a más clara."""
+    name = answer.name
+    letters = sum(c.isalpha() for c in name)
+    # "Real Madrid" -> "R _ _ _ · _ _ _ _ _ _" (el espacio entre palabras se ve como ·)
+    masked = " ".join(
+        "·" if c == " " else c if not c.isalpha() or i == 0 else "_" for i, c in enumerate(name)
+    )
+    if answer.id.startswith("team-"):
+        # subtitle de un club: "Spain · La Liga"
+        country, _, league = (answer.subtitle or "").partition(" · ")
+        clues = (
+            f"Country: {country or answer.country}",
+            f"Plays in: {league or 'a club competition'}",
+            f"{letters} letters: {masked}",
+        )
+    else:
+        # Países (subtitle = continente) y ligas (subtitle = país o región)
+        clues = (
+            f"Region: {answer.subtitle}",
+            f"Starts with {name[0]}",
+            f"{letters} letters: {masked}",
+        )
+    return clues[min(number, len(clues) - 1)]

@@ -17,6 +17,7 @@ import asyncio
 import contextlib
 import io
 import logging
+import zlib
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -34,8 +35,20 @@ from footballbot.imaging.loader import ImageDownloadError
 from footballbot.models import Question, TriviaItem
 from footballbot.services.trivia.dataset import TriviaDataset, load_dataset
 from footballbot.services.trivia.matching import simplify
-from footballbot.services.trivia.modes import DIFFICULTIES, MODES, QuestionPicker, pool_for
-from footballbot.services.trivia.session import STAGE_POINTS, AnswerMode, GameSession, Outcome
+from footballbot.services.trivia.modes import (
+    DIFFICULTIES,
+    MODES,
+    Mode,
+    QuestionPicker,
+    make_picker,
+)
+from footballbot.services.trivia.session import (
+    HINT_COST,
+    STAGE_POINTS,
+    AnswerMode,
+    GameSession,
+    Outcome,
+)
 from footballbot.storage import repos
 
 log = logging.getLogger(__name__)
@@ -129,7 +142,7 @@ class Trivia(commands.Cog):
         level = difficulty.value if difficulty else "easy"
         # Lo que ya salió en este servidor, para no repetir escudos entre partidas (issue #9)
         seen = await repos.last_seen(self.bot.db, guild.id)
-        picker = QuestionPicker(pool_for(game_mode, self.dataset, level), last_seen=seen)
+        picker = make_picker(game_mode, self.dataset, level, last_seen=seen)
         session = GameSession(
             guild_id=guild.id,
             channel_id=channel.id,
@@ -147,6 +160,20 @@ class Trivia(commands.Cog):
         task = asyncio.create_task(self._run_game(session, picker, channel))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    # /trivia hint
+    @trivia.command(name="hint", description="Get a hint for this round (you score less)")
+    async def hint(self, interaction: discord.Interaction) -> None:
+        session = self.games.get(interaction.channel_id or 0)
+        if session is None:
+            raise UserFacingError("There is no trivia game in this channel.")
+        text = session.hint(interaction.user.id)
+        if text is None:
+            raise UserFacingError("Wait for the next round to start.")
+        await interaction.response.send_message(
+            f"💡 {text}\n-# Each hint takes {HINT_COST} points off what you win this round.",
+            ephemeral=True,
+        )
 
     # /trivia stop
     @trivia.command(name="stop", description="Stop the trivia game in this channel")
@@ -280,7 +307,7 @@ class Trivia(commands.Cog):
         for _ in range(MAX_IMAGE_ATTEMPTS):
             question = picker.next()
             try:
-                return question, await self.bot.images.get(question.answer.image_url)
+                return question, await self.bot.images.get(question.subject.image_url)
             except ImageDownloadError as e:
                 log.warning("Skipping %s: %s", question.answer.name, e)
         raise RuntimeError("could not download the images for the trivia questions")
@@ -397,7 +424,8 @@ class AnswerView(discord.ui.View):
         self._buttons: list[tuple[discord.ui.Button[AnswerView], TriviaItem]] = []
         for option in question.options:
             button: discord.ui.Button[AnswerView] = discord.ui.Button(
-                label=option.name[:80], style=discord.ButtonStyle.secondary
+                label=f"{option.emoji} {option.name}"[:80] if option.emoji else option.name[:80],
+                style=discord.ButtonStyle.secondary,
             )
             button.callback = self._callback_for(option)
             self.add_item(button)
@@ -461,16 +489,33 @@ async def _edit_quietly(message: discord.Message, **kwargs: Any) -> None:
         log.warning("Could not edit a trivia message", exc_info=True)
 
 
+def _round_mode(session: GameSession) -> Mode:
+    """El modo de la ronda actual: el de la partida, o el que le tocó en `mix`."""
+    question = session.question
+    if question is not None and question.mode_key:
+        return MODES[question.mode_key]
+    return session.mode
+
+
+def _round_seed(session: GameSession) -> int:
+    """Número fijo para toda la ronda (el punto donde hace zoom no cambia entre etapas)."""
+    subject = session.question.subject.id if session.question else ""
+    return zlib.crc32(f"{subject}:{session.round}".encode())
+
+
 def _round_png(crest: bytes, session: GameSession) -> bytes:
     """La ronda como tarjeta. Si la tarjeta falla, solo la imagen con el efecto (como antes)."""
-    stage_image = render_stage(crest, session.mode.effect, session.mode.levels[session.stage])
+    mode = _round_mode(session)
+    stage_image = render_stage(
+        crest, mode.effect, mode.levels[session.stage], seed=_round_seed(session)
+    )
     try:
         return trivia_cards.round_card(
             stage_image=stage_image,
             round_no=session.round,
             total_rounds=session.total_rounds,
-            title=session.mode.title,
-            accent=hex_rgb(session.mode.color),
+            title=mode.title,
+            accent=hex_rgb(mode.color),
             stage=session.stage,
             points=STAGE_POINTS,
         )
@@ -483,6 +528,10 @@ def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> 
     """La respuesta como tarjeta. Si falla, solo el escudo limpio (como antes)."""
     assert session.question is not None
     answer = session.question.answer
+    shown = session.question.shown
+    mode = _round_mode(session)
+    # club-country: el nombre grande es el país; debajo, el club que salió en la imagen
+    subtitle = shown.name if shown else answer.subtitle
     if session.winner is not None:
         points = session.answers[-1].points
         headline, success = f"{winner_name or 'Someone'} got it  +{points}", True
@@ -493,14 +542,14 @@ def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> 
         return trivia_cards.reveal_card(
             crest=crest,
             name=answer.name,
-            subtitle=answer.subtitle,
-            accent=hex_rgb(session.mode.color),
+            subtitle=subtitle,
+            accent=hex_rgb(mode.color),
             headline=headline,
             success=success,
         )
     except Exception:
         log.exception("Could not draw the reveal card")
-        return render_stage(crest, session.mode.effect, None)
+        return render_stage(crest, mode.effect, None)
 
 
 async def _avatar_bytes(user: discord.abc.User) -> bytes | None:
@@ -561,9 +610,9 @@ def _round_embed(session: GameSession) -> discord.Embed:
     left = session.stages - session.stage
     time_bar = "⏱️ " + "🟩" * left + "⬛" * session.stage
     embed = discord.Embed(
-        title=f"Round {session.round}/{session.total_rounds} · {session.mode.prompt}",
+        title=f"Round {session.round}/{session.total_rounds} · {_round_mode(session).prompt}",
         description=f"{how}\n{time_bar}",
-        color=discord.Color(session.mode.color),
+        color=discord.Color(_round_mode(session).color),
     )
     embed.set_image(url=f"attachment://trivia-{session.round}-{session.stage}.png")
     embed.set_footer(

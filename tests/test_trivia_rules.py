@@ -267,3 +267,84 @@ def test_wrong_options_vary_within_a_game() -> None:
         uses.update(o.id for o in q.options if o.id != q.answer.id)
     # 30 opciones falsas repartidas entre 39 clubes: ninguno debería salir más de 2 veces
     assert max(uses.values()) <= 2
+
+
+# --- modos nuevos y pistas (issue #12) ---------------------------------------------------------
+
+
+def test_every_mode_has_one_level_per_stage() -> None:
+    from footballbot.imaging.effects import EFFECTS
+
+    for mode in MODES.values():
+        assert len(mode.levels) == len(STAGE_POINTS), mode.key
+        assert mode.effect in EFFECTS, mode.key
+
+
+@pytest.mark.parametrize("key", list(MODES))
+def test_every_mode_makes_valid_questions(key: str) -> None:
+    from footballbot.services.trivia.modes import MIX_MODES, make_picker
+
+    dataset = load_dataset()
+    picker = make_picker(MODES[key], dataset, "hard", rng=random.Random(9))
+    for _ in range(min(10, picker.remaining)):
+        q = picker.next()
+        names = [o.name for o in q.options]
+        assert len(names) == 4 == len(set(names))
+        assert q.answer in q.options
+        if key == "club-country":
+            assert q.shown is not None and q.shown.id.startswith("team-")
+            assert q.answer == dataset.country_of(q.shown)
+            assert all(o.id.startswith("country-") for o in q.options)
+        if key == "flag":
+            assert q.answer.image_url.startswith("https://flagcdn.com/")
+            assert all(o.emoji for o in q.options)
+        if key == "mix":
+            assert q.mode_key in MIX_MODES
+
+
+def test_countries_dataset() -> None:
+    from footballbot.services.trivia.dataset import flag_emoji
+
+    dataset = load_dataset()
+    assert len(dataset.countries) >= 60
+    assert flag_emoji("es") == "🇪🇸"
+    assert flag_emoji("gb-nir") == "🇬🇧"
+    # Todos los clubes tienen su país en countries.json
+    assert all(dataset.country_of(team) for team in dataset.teams)
+    spain = next(c for c in dataset.countries if c.name == "Spain")
+    assert is_correct("España", spain.answers)
+
+
+def test_club_country_remembers_the_club_not_the_country() -> None:
+    from footballbot.services.trivia.modes import make_picker
+
+    session = new_session()
+    picker = make_picker(MODES["club-country"], load_dataset(), "easy", rng=random.Random(3))
+    session.start_round(picker.next())
+    assert session.played[0].startswith("team-")
+
+
+def test_hints_cost_points_and_run_out() -> None:
+    from footballbot.services.trivia.session import HINT_COST, MAX_HINTS, MIN_POINTS
+
+    session = new_session()
+    assert session.hint(100) is None  # todavía no hay ronda
+    session.start_round(question())
+    hints = [session.hint(100) for _ in range(MAX_HINTS + 1)]
+    assert hints[-1] == "No more hints this round."
+    _, points = session.answer(100, choice_id="team-1")
+    assert points == max(MIN_POINTS, STAGE_POINTS[0] - HINT_COST * MAX_HINTS)
+    # Las pistas son por ronda: en la siguiente vuelve a ganar todo
+    session.start_round(question(2))
+    _, points = session.answer(100, choice_id="team-2")
+    assert points == STAGE_POINTS[0] + 10  # +10 de racha
+
+
+def test_hint_texts_go_from_vague_to_clear() -> None:
+    from footballbot.services.trivia.session import hint_text
+
+    teams = {t.id: t for t in load_dataset().teams}
+    real = teams["team-86"]
+    assert hint_text(real, 0) == "Country: Spain"
+    assert hint_text(real, 1) == "Plays in: La Liga"
+    assert hint_text(real, 2) == "10 letters: R _ _ _ · _ _ _ _ _ _"

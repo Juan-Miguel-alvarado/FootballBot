@@ -20,14 +20,26 @@ class TriviaItem:
     difficulty: int  # 1 fácil, 2 media, 3 difícil
     country: str | None = None  # para elegir opciones falsas parecidas (mismo país)
     subtitle: str | None = None  # se muestra al revelar: "Spain · La Liga"
+    emoji: str | None = None  # países: la bandera para los botones ("🇪🇸 Spain")
 
 
 @dataclass(frozen=True, slots=True)
 class Question:
-    """Una ronda: la respuesta correcta y las 4 opciones de los botones (ya mezcladas)."""
+    """Una ronda: la respuesta correcta y las 4 opciones de los botones (ya mezcladas).
+
+    Casi siempre la imagen es la de la respuesta (el escudo del club que hay que adivinar).
+    En `club-country` se muestra un club (`shown`) pero la respuesta es su país.
+    """
 
     answer: TriviaItem
     options: tuple[TriviaItem, ...]
+    shown: TriviaItem | None = None  # lo que sale en la imagen, si no es la respuesta
+    mode_key: str | None = None  # modo `mix`: qué modo le tocó a esta ronda
+
+    @property
+    def subject(self) -> TriviaItem:
+        """Lo que se ve en la imagen: es lo que se recuerda para no repetirlo (issue #9)."""
+        return self.shown or self.answer
 
 
 @dataclass(frozen=True, slots=True)
