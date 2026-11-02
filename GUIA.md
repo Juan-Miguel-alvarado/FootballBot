@@ -86,6 +86,7 @@ data/dataset/                ── DATOS DE LA TRIVIA (en el repo) ──
 └── aliases.json             Apodos de los clubes, A MANO: "barca", "los blancos"...
 
 scripts/build_dataset.py     Regenera teams.json y leagues.json desde football-data.org
+scripts/make_preview.py      Regenera docs/preview.gif (el GIF del README) con las tarjetas reales
 
 tests/
 ├── test_football_data.py    El provider, con respuestas reales guardadas (sin internet)

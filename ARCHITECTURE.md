@@ -94,7 +94,8 @@ FootballBot/
 │   ├── dataset/               # teams.json, leagues.json (generated, committed) + aliases.json (by hand)
 │   └── cache/                 # downloaded images (gitignored)
 ├── scripts/
-│   └── build_dataset.py       # builds the trivia dataset from the APIs
+│   ├── build_dataset.py       # builds the trivia dataset from the APIs
+│   └── make_preview.py        # builds docs/preview.gif (README) from the real cards
 ├── tests/
 ├── .env.example
 ├── pyproject.toml             # dependencies, ruff and pytest config
