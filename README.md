@@ -1,33 +1,54 @@
 # FootballBot
 
-A Discord bot about football: **live league information** (matches, standings, top scorers, teams, players) and **image-based trivia** in the style of country-flag quiz bots, but with club crests — guess the club from a pixelated crest, a silhouette, the stadium, the kit, guess the player from their career path, and more.
+A Discord bot about football: **live league information** (matches, standings, team profiles) and **image trivia** in the style of country-flag quiz bots, but with club crests: guess the club from a pixelated crest, a silhouette or a zoomed-in piece, the country of a club, the national team from its flag, and more.
 
-> Status: **Phase 2 done (MVP)**: football info (`/matches`, `/live`, `/standings`, `/team`, `/leagues`) and crest trivia (`/trivia start`, `/trivia stop`, `/leaderboard`). Next: Phase 3, more trivia modes. See [ROADMAP.md](ROADMAP.md).
+<p align="center">
+  <img src="docs/preview.gif" alt="FootballBot preview: trivia rounds, answer cards, podium, standings and team cards" width="560">
+</p>
+
+<sub>The preview shows the real images the bot sends, made with real data by <code>scripts/make_preview.py</code>.</sub>
+
+> **Status:** the MVP (Phases 0-2) is done, plus the crest and flag modes of Phase 3 and the image cards of Phase 4. Next: player trivia, alerts and running it 24/7. See [ROADMAP.md](ROADMAP.md).
 
 ---
 
-## What it will do
+## What it does
 
-### 1. Football information (via API)
-- Today's, live and upcoming matches, by league or by team.
-- League standings, top scorers and top assists.
-- Team and player profiles with crest/photo.
-- Follow a team and get goal and result alerts in a channel.
-- Generated image cards (standings table, player comparison, recent form).
+### ⚽ Football info
+| Command | What you get |
+|---|---|
+| `/matches [league] [date]` | The day's matches, one embed per league in its color, winners in bold |
+| `/live [league]` | Matches being played right now (free data is a few minutes behind) |
+| `/standings <league>` | **Image card** of the table: crests, a color per zone (Champions League, relegation...) and the legend |
+| `/team <team>` | **Image card** in the club's color: crest, stadium, coach, W/D/L form and the next match as a "versus" |
+| `/leagues` | The 13 supported competitions and their codes |
 
-### 2. Image trivia
-- **Pixelated / blurred crest** that gets revealed over time (the main mode).
-- Crest **silhouette**, **zoom** into a piece of the crest, **league logo**.
-- **Stadium**, **kit**, **player photo**.
-- **Career path**: a row of crests with years → who is the player?
-- **Higher or lower**, **3x3 grid**, **daily player** (Wordle style).
-- Extra: country **flags** for national teams and a club's country.
-- Points, streaks, per-server and global leaderboards.
+Leagues, teams and dates have autocomplete. Data covers the 13 competitions of football-data.org's free plan: the top 5 European leagues, Eredivisie, Primeira Liga, Championship, Brasileirão, Champions League, Copa Libertadores, World Cup and Euro.
 
-### 3. Social
-- Profile card with stats, achievements, match prediction pools and (later) a sticker/card album.
+### 🧩 Trivia
+`/trivia start <mode> [difficulty] [rounds] [answers]` starts a game in the channel. The image gets clearer every 5 seconds; answering earlier gives more points (100 / 75 / 50 / 25), and winning rounds in a row adds a streak bonus.
 
-The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
+| Mode | You see | You guess |
+|---|---|---|
+| Pixelated crest | A pixelated crest | The club |
+| Blurred crest | A blurred crest | The club |
+| Silhouette | The crest filled black | The club |
+| Zoomed crest | A small piece of the crest that zooms out | The club |
+| Club country | A crest | Its country (buttons with flags) |
+| Flags | A pixelated flag | The national team |
+| League logo | A pixelated league logo | The competition |
+| Mix | A different crest mode each round | The club |
+
+- **Answers:** 4 buttons, or typed in the chat (accents, typos and nicknames like `barca`, `atleti` or `spurs` all count).
+- **Difficulty:** easy (top 5 leagues), medium (more European and Brazilian clubs), hard (Championship and Libertadores too).
+- **No repeats:** each server remembers which crests already came up, so you don't see the same one until all of them have.
+- `/trivia hint` gives a private hint (costs points), `/trivia stop` ends the game, and every game ends with a **podium** with the players' avatars.
+- `/leaderboard [mode]`: the server ranking as an image card.
+
+### 🛠️ Utilities
+`/help` (commands by category), `/ping` (latency and API status).
+
+The full catalog, including what is planned, is in [COMMANDS.md](COMMANDS.md).
 
 ---
 
@@ -38,14 +59,14 @@ The full catalog with priorities is in [COMMANDS.md](COMMANDS.md).
 | Main language | **Python 3.12+** |
 | Discord | [`discord.py`](https://discordpy.readthedocs.io/) 2.x (slash commands, buttons, select menus, autocomplete) |
 | HTTP | `httpx` (async) |
-| Images | `Pillow` |
-| Database | SQLite with `aiosqlite` at first, PostgreSQL if it grows |
+| Images | `Pillow` with the free Inter and Oswald fonts |
+| Database | SQLite with `aiosqlite` (numbered migrations), PostgreSQL if it grows |
 | Answer matching | `rapidfuzz` + `unidecode` |
 | Config | `.env` + `pydantic-settings` |
 | Quality | `ruff`, `pytest`, GitHub Actions |
 | Extra (optional) | JS/TS for a web leaderboard dashboard later on |
 
-Data sources, all free (see [APIS.md](APIS.md)): **football-data.org**, **TheSportsDB**, **flagcdn** for flags (secondary) and **Wikidata** as a backup for player careers.
+Data sources, all free (see [APIS.md](APIS.md)): **football-data.org** (matches, tables, teams, crests) and **flagcdn** (flags) today; **TheSportsDB** and **Wikidata** come in with the player modes.
 
 ---
 
@@ -92,6 +113,13 @@ Checks (the same ones CI runs on every PR):
 ```bash
 ruff check . && ruff format --check .
 pytest
+```
+
+Scripts:
+
+```bash
+python scripts/build_dataset.py   # rebuild the trivia clubs and league logos (each season)
+python scripts/make_preview.py    # regenerate docs/preview.gif after changing the card design
 ```
 
 > Never commit `.env` or the bot token. If a token leaks, regenerate it in the Discord Developer Portal immediately.

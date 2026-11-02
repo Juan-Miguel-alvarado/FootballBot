@@ -2,7 +2,7 @@
 
 Mark tasks with `[x]` when done and put the owner's name next to them: `- [ ] Task — @name`.
 
-**Current status:** Phases 0, 1 and 2 done (end of the MVP). Next: everyone plays it on the server, then **Phase 3 — more image trivia**.
+**Current status:** Phases 0, 1 and 2 done (MVP). From Phase 3, the crest and flag modes and `/trivia hint` are done (#12); from Phase 4, the standings and team cards (#10). The trivia also got image cards (#11), no repeated crests (#9) and a polished UI (#13). Next: the player modes of Phase 3 (need the TheSportsDB player dataset), then the rest of Phase 4.
 
 ---
 
