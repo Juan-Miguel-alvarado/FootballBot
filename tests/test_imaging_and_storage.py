@@ -200,3 +200,25 @@ async def test_migration_002_upgrades_an_existing_database(tmp_path: Path) -> No
     await repos.mark_seen(database, 1, ["team-86"])
     assert "team-86" in await repos.last_seen(database, 1)
     await database.close()
+
+
+def test_silhouette_hides_the_colors() -> None:
+    from footballbot.imaging.effects import BACKGROUND, SILHOUETTE_COLOR
+
+    image = Image.open(io.BytesIO(render_stage(crest_png(), "silhouette", 0)))
+    colors = {color for _, color in image.convert("RGB").getcolors(maxcolors=100_000)}
+    # Solo el fondo, el negro de la silueta y sus bordes suavizados: nada rojo ni azul
+    assert BACKGROUND in colors and SILHOUETTE_COLOR in colors
+    assert (200, 30, 30) not in colors and (30, 30, 200) not in colors
+
+
+def test_zoom_depends_on_the_seed_and_keeps_the_size() -> None:
+    a = render_stage(crest_png(), "zoom", 0.2, seed=1)
+    b = render_stage(crest_png(), "zoom", 0.2, seed=2)
+    assert Image.open(io.BytesIO(a)).size == (SIZE, SIZE)
+    assert a != b
+    assert render_stage(crest_png(), "zoom", 0.2, seed=1) == a  # misma ronda, mismo punto
+
+
+def test_none_effect_shows_the_crest() -> None:
+    assert render_stage(crest_png(), "none", 0) == render_stage(crest_png(), "pixelate", None)

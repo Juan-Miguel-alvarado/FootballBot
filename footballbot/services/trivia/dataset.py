@@ -3,6 +3,8 @@
 Archivos:
 - teams.json: los clubes. Lo genera `python scripts/build_dataset.py`; no se edita a mano.
 - leagues.json: los logos de las ligas. Lo genera el mismo script.
+- countries.json: países y selecciones, a mano (modos `flag` y `club-country`): código de
+  flagcdn ("es", "gb-eng"), nombre como lo escribe la API, continente, dificultad y apodos.
 - aliases.json: apodos de los clubes, a mano. Cada entrada es
     {"id": 86, "name": "Real Madrid", "aliases": ["madrid", "los blancos", ...]}
   `id` es el id del club en teams.json. `name` es el nombre que se muestra en la trivia
@@ -27,15 +29,36 @@ log = logging.getLogger(__name__)
 DATASET_DIR = Path(__file__).resolve().parents[3] / "data" / "dataset"
 
 
+# Banderas de flagcdn (sin key, sin límites). w640 = 640 px de ancho.
+FLAG_URL = "https://flagcdn.com/w640/{code}.png"
+# Inglaterra, Escocia y Gales tienen su propio emoji; Irlanda del Norte no (se usa el británico)
+SUBDIVISION_EMOJI = {
+    "gb-eng": "🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f",
+    "gb-sct": "🏴\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f",
+    "gb-wls": "🏴\U000e0067\U000e0062\U000e0077\U000e006c\U000e0073\U000e007f",
+    "gb-nir": "🇬🇧",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class TriviaDataset:
     teams: tuple[TriviaItem, ...]
     leagues: tuple[TriviaItem, ...]
+    countries: tuple[TriviaItem, ...] = ()
+
+    def country_of(self, team: TriviaItem) -> TriviaItem | None:
+        """El país de un club, como TriviaItem (para el modo club-country)."""
+        for country in self.countries:
+            if country.name == team.country:
+                return country
+        return None
 
 
 def load_dataset(directory: Path = DATASET_DIR) -> TriviaDataset:
     teams = _read(directory / "teams.json")
     leagues = _read(directory / "leagues.json")
+    countries_path = directory / "countries.json"
+    countries = _read(countries_path) if countries_path.exists() else []
     aliases_path = directory / "aliases.json"
     aliases = {entry["id"]: entry for entry in _read(aliases_path)} if aliases_path.exists() else {}
 
@@ -46,8 +69,14 @@ def load_dataset(directory: Path = DATASET_DIR) -> TriviaDataset:
     dataset = TriviaDataset(
         teams=tuple(_team_item(team, aliases.get(team["id"])) for team in teams),
         leagues=tuple(_league_item(league) for league in leagues),
+        countries=tuple(_country_item(country) for country in countries),
     )
-    log.info("Trivia dataset: %d teams, %d leagues", len(dataset.teams), len(dataset.leagues))
+    log.info(
+        "Trivia dataset: %d teams, %d leagues, %d countries",
+        len(dataset.teams),
+        len(dataset.leagues),
+        len(dataset.countries),
+    )
     return dataset
 
 
@@ -87,6 +116,28 @@ def _league_item(league: dict) -> TriviaItem:
         country=league["area"],
         subtitle=league["area"],
     )
+
+
+def _country_item(country: dict) -> TriviaItem:
+    return TriviaItem(
+        id=f"country-{country['code']}",
+        name=country["name"],
+        full_name=country["name"],
+        answers=_answers([country["name"], *country["aliases"]]),
+        image_url=FLAG_URL.format(code=country["code"]),
+        difficulty=country["difficulty"],
+        # En los países, `country` guarda el continente: las opciones falsas salen del mismo
+        country=country["continent"],
+        subtitle=country["continent"],
+        emoji=flag_emoji(country["code"]),
+    )
+
+
+def flag_emoji(code: str) -> str:
+    """ "es" -> 🇪🇸. Las letras del código se convierten en "letras indicadoras regionales"."""
+    if code in SUBDIVISION_EMOJI:
+        return SUBDIVISION_EMOJI[code]
+    return "".join(chr(0x1F1E6 + ord(letter) - ord("a")) for letter in code.lower())
 
 
 def _answers(names: list[str]) -> tuple[str, ...]:

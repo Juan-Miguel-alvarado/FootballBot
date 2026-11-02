@@ -88,15 +88,16 @@ Notes from building it:
 
 ## Phase 3 — More image trivia
 
-- [ ] Effects `silhouette`, `zoom_crop`, `grayscale`
-- [ ] Modes `silhouette`, `zoom`, `club-country`, `flag`, `stadium`
+- [x] Effects `silhouette`, `zoom` — @Juan-Miguel-alvarado (#12)
+- [x] Modes `silhouette`, `zoom`, `club-country`, `flag` — @Juan-Miguel-alvarado (#12)
+- [ ] `stadium` mode (needs TheSportsDB stadium photos)
 - [ ] Player dataset (football-data squads + TheSportsDB): photo, nationality, position, clubs with years
 - [ ] `player` mode (blurred black and white photo)
 - [ ] `career` mode with a composite crest image
 - [ ] `who-am-i` mode with progressive clues
 - [ ] `higher-lower` mode with a double card
 - [ ] Easy / medium / hard difficulties
-- [ ] `/hint` and `mix` mode
+- [x] `/trivia hint` and `mix` mode — @Juan-Miguel-alvarado (#12)
 
 ---
 

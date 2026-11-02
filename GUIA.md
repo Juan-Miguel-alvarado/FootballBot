@@ -82,6 +82,7 @@ footballbot/
 data/dataset/                ── DATOS DE LA TRIVIA (en el repo) ──
 ├── teams.json               226 clubes con escudo y dificultad (lo genera el script)
 ├── leagues.json             Logos de las 13 ligas (lo genera el script)
+├── countries.json           68 países: bandera, continente, dificultad y apodos (A MANO)
 └── aliases.json             Apodos de los clubes, A MANO: "barca", "los blancos"...
 
 scripts/build_dataset.py     Regenera teams.json y leagues.json desde football-data.org
@@ -171,7 +172,9 @@ Los `__init__.py` solo le dicen a Python que la carpeta es un paquete; no tienen
 | **Una variable de configuración** | [config.py](footballbot/config.py) y [.env.example](.env.example) |
 | **Un mensaje de error** | `on_app_command_error` en [bot.py](footballbot/bot.py) |
 | **Un apodo para la trivia** | [data/dataset/aliases.json](data/dataset/aliases.json). No hace falta regenerar nada; al reiniciar el bot ya cuenta |
-| **Un modo de trivia nuevo** | El efecto en [imaging/effects.py](footballbot/imaging/effects.py) (y en `EFFECTS`) + una entrada en `MODES` de [modes.py](footballbot/services/trivia/modes.py). Aparece solo en `/trivia start` |
+| **Un modo de trivia nuevo** | El efecto en [imaging/effects.py](footballbot/imaging/effects.py) (y en `EFFECTS`) + una entrada en `MODES` de [modes.py](footballbot/services/trivia/modes.py). Aparece solo en `/trivia start`. Si la pregunta se arma distinto (como `club-country`), un picker nuevo en el mismo archivo |
+| **Un país para `flag` o un apodo de país** | [data/dataset/countries.json](data/dataset/countries.json) |
+| **Las pistas de `/trivia hint`** | `hint_text` en [session.py](footballbot/services/trivia/session.py) |
 | **Cambiar puntos, etapas o tiempos** | Puntos y racha: arriba de [session.py](footballbot/services/trivia/session.py). Segundos por etapa: arriba de [cogs/trivia.py](footballbot/cogs/trivia.py). Intensidad del efecto: `levels` en [modes.py](footballbot/services/trivia/modes.py) |
 | **Actualizar los clubes (nueva temporada)** | `python scripts/build_dataset.py` y sube los JSON |
 | **Cambiar una tabla de la base de datos** | Una migración NUEVA en `storage/migrations/` (`002_...sql`); nunca edites `001_init.sql`. Las consultas van en [storage/repos.py](footballbot/storage/repos.py) |
