@@ -42,8 +42,9 @@ Every team/player/league argument uses **autocomplete** (Discord suggests while 
 - Two ways to answer (configurable per mode):
   - **Buttons** — 4 options, each player answers once. Fast and does not need to read chat.
   - **Typed** — answer in chat. Tolerates typos and nicknames (`barca`, `atleti`, `juve`, `spurs`). Requires the *Message Content* intent and `TRIVIA_TYPED_ANSWERS=true`.
+- Each round is a **card** (round number, mode, the crest with its effect in a frame and the points bar) with a ⏱️ time bar in the message; the answer is revealed on another card (club, country and league, who got it) and the game ends with a **podium** with Discord avatars.
 - Images are **revealed in stages**: 4 stages of 5 s. Points by stage: 100 / 75 / 50 / 25, plus +10 per round won in a row (up to +50). The first correct answer wins the round; with buttons, a wrong answer locks you out of that round.
-- `/trivia stop` ends the game (whoever started it, or someone with *Manage Messages*). `/hint` (v2) will spend points on a text hint.
+- `/trivia stop` ends the game (whoever started it, or someone with *Manage Messages*). `/trivia hint` gives a private hint (country → league → letters, or region → first letter → letters); each one takes 25 points off what you win that round, up to 3 per round.
 - Difficulty: **easy** (Europe's top 5 leagues), **medium** (+ Eredivisie, Primeira Liga, Brasileirão, Champions League clubs), **hard** (+ Championship and Copa Libertadores).
 
 ### Modes
@@ -54,10 +55,10 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 |---|---|---|---|---|
 | `crest` | Pixelated crest that gets clearer | The club | Progressive pixelation (downscale and upscale) | MVP |
 | `blur` | Blurred crest | The club | Decreasing Gaussian blur | MVP |
-| `silhouette` | Crest filled solid black | The club | Alpha channel to solid black | v2 |
-| `zoom` | A small crop of the crest that zooms out | The club | Random crop that grows each stage | v2 |
-| `flag` | A country's flag | The national team | flagcdn flag, can be pixelated | v2 |
-| `club-country` | A club crest | The club's country (options shown as flags) | Buttons with flag emoji | v2 |
+| `silhouette` | Crest filled solid black, color seeps in each stage | The club | Alpha channel to solid black | **Done** |
+| `zoom` | A small crop of the crest that zooms out | The club | Random crop (same point all round) that grows each stage | **Done** |
+| `flag` | A country's flag, pixelated | The national team (68 in `countries.json`) | flagcdn flag | **Done** |
+| `club-country` | A club crest | The club's country (options shown as flags) | Buttons with flag emoji | **Done** |
 | `club-clues` | Country flag + club colors + year founded + stadium | The club | Generated clue card | v2 |
 | `stadium` | Stadium photo | The stadium or the club | TheSportsDB photo, cropped | v2 |
 | `kit` | Club kit | The club | Kit image, logos removed if possible | Idea |
@@ -68,7 +69,7 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 | `grid` | 3x3 grid with crests/flags on rows and columns | A player matching both | Generated grid | Idea |
 | `scoreline` | Two crests + date of a historic match | The final score | Versus card | Idea |
 | `league` | Pixelated league logo | The league | Same as `crest` | MVP |
-| `mix` | Random mode from the ones above | — | — | v2 |
+| `mix` | A random crest mode each round (crest, blur, silhouette, zoom) | The club | — | **Done** |
 
 ### Daily
 
@@ -83,7 +84,7 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 
 | Command | What it does | Image | Priority |
 |---|---|---|---|
-| `/leaderboard [mode]` | Server points table (global ranking in Phase 5) | Text now, generated card later | MVP |
+| `/leaderboard [mode]` | Server points table (global ranking in Phase 5) | **Generated card** with avatars and medals | MVP |
 | `/profile [user]` | Points, accuracy, streak, favorite mode | **Profile card** with Discord avatar | v2 |
 | `/achievements` | Unlocked badges (100 crests, 10-answer streak, etc.) | Badge grid | Idea |
 | `/pool create <league> <matchday>` | Prediction pool for a matchday; everyone submits their score | — | Idea |

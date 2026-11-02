@@ -107,3 +107,48 @@ async def test_info_cog_builds_the_standings_card_even_if_crests_fail() -> None:
     png = await cog._standings_image(get_league("PL"), [table])
     assert png is not None
     assert png_size(png)[0] == cards.WIDTH
+
+
+# --- tarjetas de la trivia (issue #11) ---------------------------------------------------------
+
+
+def test_round_and_reveal_cards() -> None:
+    from footballbot.imaging import trivia_cards as tc
+    from footballbot.imaging.effects import render_stage
+
+    stage = render_stage(crest(), "pixelate", 6)
+    for current in range(4):
+        size = png_size(
+            tc.round_card(stage_image=stage, round_no=1, total_rounds=10, title="Crest",
+                          accent=(52, 199, 89), stage=current, points=(100, 75, 50, 25))
+        )  # fmt: skip
+        assert size == (tc.WIDTH, 680)
+    for success in (True, False):
+        size = png_size(
+            tc.reveal_card(crest=crest(), name="Real Madrid", subtitle="Spain · La Liga",
+                           accent=(52, 199, 89), headline="x got it +75", success=success)
+        )  # fmt: skip
+        assert size == (tc.WIDTH, 600)
+
+
+@pytest.mark.parametrize("count", [1, 2, 3, 7, 12])
+def test_podium_and_leaderboard_with_any_number_of_players(count: int) -> None:
+    from footballbot.imaging import trivia_cards as tc
+
+    players = [tc.PlayerEntry(f"Player {i}", None, 100 - i, "1 correct") for i in range(count)]
+    podium = png_size(tc.podium_card(title="Game over", subtitle="", accent=(0, 0, 0),
+                                     players=players))  # fmt: skip
+    board = png_size(tc.leaderboard_card(title="Leaderboard", subtitle="", accent=(0, 0, 0),
+                                         players=players))  # fmt: skip
+    assert podium[0] == board[0] == tc.WIDTH
+    # El podio muestra hasta 10 (3 arriba + 7 en lista); el ranking crece con cada jugador
+    assert board[1] == 140 + count * 76 + 30
+
+
+def test_avatar_with_and_without_picture() -> None:
+    from footballbot.imaging.draw import avatar
+
+    assert avatar(None, 64, "Juan").size == (64, 64)
+    picture = avatar(crest(), 64, "Juan")
+    assert picture.mode == "RGBA"
+    assert picture.getpixel((0, 0))[3] == 0  # la esquina queda transparente: es redondo

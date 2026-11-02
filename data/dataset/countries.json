@@ -1,0 +1,583 @@
+[
+ {
+  "code": "gb-eng",
+  "name": "England",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "inglaterra"
+  ]
+ },
+ {
+  "code": "es",
+  "name": "Spain",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "espana"
+  ]
+ },
+ {
+  "code": "de",
+  "name": "Germany",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "alemania"
+  ]
+ },
+ {
+  "code": "it",
+  "name": "Italy",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "italia"
+  ]
+ },
+ {
+  "code": "fr",
+  "name": "France",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "francia"
+  ]
+ },
+ {
+  "code": "pt",
+  "name": "Portugal",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": []
+ },
+ {
+  "code": "nl",
+  "name": "Netherlands",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "holland",
+   "holanda",
+   "paises bajos"
+  ]
+ },
+ {
+  "code": "be",
+  "name": "Belgium",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "belgica"
+  ]
+ },
+ {
+  "code": "br",
+  "name": "Brazil",
+  "continent": "South America",
+  "difficulty": 1,
+  "aliases": [
+   "brasil"
+  ]
+ },
+ {
+  "code": "ar",
+  "name": "Argentina",
+  "continent": "South America",
+  "difficulty": 1,
+  "aliases": []
+ },
+ {
+  "code": "uy",
+  "name": "Uruguay",
+  "continent": "South America",
+  "difficulty": 1,
+  "aliases": []
+ },
+ {
+  "code": "co",
+  "name": "Colombia",
+  "continent": "South America",
+  "difficulty": 1,
+  "aliases": []
+ },
+ {
+  "code": "mx",
+  "name": "Mexico",
+  "continent": "North America",
+  "difficulty": 1,
+  "aliases": [
+   "méxico"
+  ]
+ },
+ {
+  "code": "us",
+  "name": "United States",
+  "continent": "North America",
+  "difficulty": 1,
+  "aliases": [
+   "usa",
+   "united states of america",
+   "estados unidos",
+   "eeuu"
+  ]
+ },
+ {
+  "code": "jp",
+  "name": "Japan",
+  "continent": "Asia",
+  "difficulty": 1,
+  "aliases": [
+   "japon"
+  ]
+ },
+ {
+  "code": "hr",
+  "name": "Croatia",
+  "continent": "Europe",
+  "difficulty": 1,
+  "aliases": [
+   "croacia"
+  ]
+ },
+ {
+  "code": "gb-sct",
+  "name": "Scotland",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "escocia"
+  ]
+ },
+ {
+  "code": "gb-wls",
+  "name": "Wales",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "gales"
+  ]
+ },
+ {
+  "code": "ch",
+  "name": "Switzerland",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "suiza"
+  ]
+ },
+ {
+  "code": "dk",
+  "name": "Denmark",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "dinamarca"
+  ]
+ },
+ {
+  "code": "se",
+  "name": "Sweden",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "suecia"
+  ]
+ },
+ {
+  "code": "no",
+  "name": "Norway",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "noruega"
+  ]
+ },
+ {
+  "code": "pl",
+  "name": "Poland",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "polonia"
+  ]
+ },
+ {
+  "code": "tr",
+  "name": "Turkey",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "turquia",
+   "turkiye"
+  ]
+ },
+ {
+  "code": "at",
+  "name": "Austria",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "gr",
+  "name": "Greece",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "grecia"
+  ]
+ },
+ {
+  "code": "ua",
+  "name": "Ukraine",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "ucrania"
+  ]
+ },
+ {
+  "code": "cz",
+  "name": "Czech Republic",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "czechia",
+   "chequia",
+   "republica checa"
+  ]
+ },
+ {
+  "code": "rs",
+  "name": "Serbia",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "ie",
+  "name": "Ireland",
+  "continent": "Europe",
+  "difficulty": 2,
+  "aliases": [
+   "irlanda",
+   "republic of ireland"
+  ]
+ },
+ {
+  "code": "cl",
+  "name": "Chile",
+  "continent": "South America",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "pe",
+  "name": "Peru",
+  "continent": "South America",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "ec",
+  "name": "Ecuador",
+  "continent": "South America",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "py",
+  "name": "Paraguay",
+  "continent": "South America",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "ma",
+  "name": "Morocco",
+  "continent": "Africa",
+  "difficulty": 2,
+  "aliases": [
+   "marruecos"
+  ]
+ },
+ {
+  "code": "sn",
+  "name": "Senegal",
+  "continent": "Africa",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "ng",
+  "name": "Nigeria",
+  "continent": "Africa",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "eg",
+  "name": "Egypt",
+  "continent": "Africa",
+  "difficulty": 2,
+  "aliases": [
+   "egipto"
+  ]
+ },
+ {
+  "code": "ca",
+  "name": "Canada",
+  "continent": "North America",
+  "difficulty": 2,
+  "aliases": [
+   "canadá"
+  ]
+ },
+ {
+  "code": "kr",
+  "name": "South Korea",
+  "continent": "Asia",
+  "difficulty": 2,
+  "aliases": [
+   "korea",
+   "corea del sur",
+   "korea republic"
+  ]
+ },
+ {
+  "code": "au",
+  "name": "Australia",
+  "continent": "Oceania",
+  "difficulty": 2,
+  "aliases": []
+ },
+ {
+  "code": "sa",
+  "name": "Saudi Arabia",
+  "continent": "Asia",
+  "difficulty": 2,
+  "aliases": [
+   "arabia saudita",
+   "arabia saudi"
+  ]
+ },
+ {
+  "code": "hu",
+  "name": "Hungary",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "hungria"
+  ]
+ },
+ {
+  "code": "ro",
+  "name": "Romania",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "rumania"
+  ]
+ },
+ {
+  "code": "sk",
+  "name": "Slovakia",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "eslovaquia"
+  ]
+ },
+ {
+  "code": "si",
+  "name": "Slovenia",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "eslovenia"
+  ]
+ },
+ {
+  "code": "ba",
+  "name": "Bosnia and Herzegovina",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "bosnia"
+  ]
+ },
+ {
+  "code": "al",
+  "name": "Albania",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "ge",
+  "name": "Georgia",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "is",
+  "name": "Iceland",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "islandia"
+  ]
+ },
+ {
+  "code": "fi",
+  "name": "Finland",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "finlandia"
+  ]
+ },
+ {
+  "code": "az",
+  "name": "Azerbaijan",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "azerbaiyan"
+  ]
+ },
+ {
+  "code": "mc",
+  "name": "Monaco",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "gb-nir",
+  "name": "Northern Ireland",
+  "continent": "Europe",
+  "difficulty": 3,
+  "aliases": [
+   "irlanda del norte"
+  ]
+ },
+ {
+  "code": "ve",
+  "name": "Venezuela",
+  "continent": "South America",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "bo",
+  "name": "Bolivia",
+  "continent": "South America",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "cr",
+  "name": "Costa Rica",
+  "continent": "North America",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "pa",
+  "name": "Panama",
+  "continent": "North America",
+  "difficulty": 3,
+  "aliases": [
+   "panamá"
+  ]
+ },
+ {
+  "code": "jm",
+  "name": "Jamaica",
+  "continent": "North America",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "gh",
+  "name": "Ghana",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "cm",
+  "name": "Cameroon",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": [
+   "camerun"
+  ]
+ },
+ {
+  "code": "ci",
+  "name": "Ivory Coast",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": [
+   "cote d'ivoire",
+   "costa de marfil"
+  ]
+ },
+ {
+  "code": "dz",
+  "name": "Algeria",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": [
+   "argelia"
+  ]
+ },
+ {
+  "code": "tn",
+  "name": "Tunisia",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": [
+   "tunez"
+  ]
+ },
+ {
+  "code": "za",
+  "name": "South Africa",
+  "continent": "Africa",
+  "difficulty": 3,
+  "aliases": [
+   "sudafrica"
+  ]
+ },
+ {
+  "code": "ir",
+  "name": "Iran",
+  "continent": "Asia",
+  "difficulty": 3,
+  "aliases": []
+ },
+ {
+  "code": "qa",
+  "name": "Qatar",
+  "continent": "Asia",
+  "difficulty": 3,
+  "aliases": [
+   "catar"
+  ]
+ },
+ {
+  "code": "nz",
+  "name": "New Zealand",
+  "continent": "Oceania",
+  "difficulty": 3,
+  "aliases": [
+   "nueva zelanda"
+  ]
+ }
+]
