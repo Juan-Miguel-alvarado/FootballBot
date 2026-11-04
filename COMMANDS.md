@@ -14,10 +14,10 @@ The **Image** column describes the image the command produces or uses.
 
 | Command | What it does | Image | Priority |
 |---|---|---|---|
-| `/matches [league] [date]` | Today's matches (or a given date): one embed per league in its color, winners in bold | League logo per embed | MVP |
-| `/live [league]` | Matches in progress with score, one embed per league (the free plan does not give the minute) | League logo per embed | MVP |
-| `/standings <league>` | League table with the leader on top and a color per zone (🔵 Champions, 🟠 Europa, 🟢 Conference, 🟡 playoff, 🔴 relegation) | **Generated card**: league header, crests, a color stripe per zone and the legend (text table as a fallback) | MVP |
-| `/team <name>` | Profile: crest, country, stadium, coach, founded, colors, recent form, last and next match | **Generated card** in the club's color: big crest, W/D/L form boxes and the next match as a "versus" (text embed as a fallback) | MVP |
+| `/matches [league] [date]` | Today's matches (or a given date) in one compact message, a section per league, winners in bold; says so clearly when a day has no matches | League logo when one league is chosen | MVP |
+| `/live [league]` | Matches in progress with score, a section per league (the free plan does not give the minute) | League logo when one league is chosen | MVP |
+| `/standings <league>` | League table with the leader on top and a color per zone (Champions, Europa, Conference, playoff, relegation) | **Generated card**: league header, sticker crests, positions colored by zone and the legend (text table as a fallback) | MVP |
+| `/team <name>` | Profile: crest, country, stadium, coach, founded, colors, recent form, last and next match, link to the club's website | **Generated card**: big sticker crest, W/D/L form boxes and the next match as a "versus" (text embed as a fallback) | MVP |
 | `/scorers <league>` | Top 10 scorers | Card with player photos | v2 |
 | `/assists <league>` | Top 10 assists | Same as scorers | v2 |
 | `/player <name>` | Profile: photo, club, position, age, season stats | Photo + nationality flag | v2 |
@@ -84,7 +84,7 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 
 | Command | What it does | Image | Priority |
 |---|---|---|---|
-| `/leaderboard [mode]` | Server points table (global ranking in Phase 5) | **Generated card** with avatars and medals | MVP |
+| `/leaderboard [mode]` | Server points table (global ranking in Phase 5) | **Generated card** with avatars and the top 3 highlighted | MVP |
 | `/profile [user]` | Points, accuracy, streak, favorite mode | **Profile card** with Discord avatar | v2 |
 | `/achievements` | Unlocked badges (100 crests, 10-answer streak, etc.) | Badge grid | Idea |
 | `/pool create <league> <matchday>` | Prediction pool for a matchday; everyone submits their score | — | Idea |
@@ -98,8 +98,8 @@ The core of the trivia is **club crests and league logos** (`crest`, `blur`, `si
 
 | Command | What it does | Priority |
 |---|---|---|
-| `/help [command]` | Commands by category (⚽ Football · 🧩 Trivia · 🛠️ Utilities) with examples | MVP |
-| `/ping` | Bot latency and API status, colored 🟢🟡🔴 by latency | MVP |
+| `/help [command]` | Commands by category (Football · Trivia · Utilities); `/help <command>` shows usage and options | MVP |
+| `/ping` | Status at a glance: Discord latency, football API, quota left this minute and teams indexed | MVP |
 | `/config trivia-channel <channel>` | Restrict trivia to one channel | v2 |
 | `/config leagues <leagues>` | Server's default leagues | v2 |
 | `/config answers <buttons\|typed>` | Default answer mode | v2 |

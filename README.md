@@ -6,26 +6,26 @@ A Discord bot about football: **live league information** (matches, standings, t
   <img src="docs/preview.gif" alt="FootballBot preview: trivia rounds, answer cards, podium, standings and team cards" width="560">
 </p>
 
-<sub>The preview shows the real images the bot sends, made with real data by <code>scripts/make_preview.py</code>. Every card follows the bot's logo: black, one electric blue and the ball's fragments.</sub>
+<sub>The preview shows the real images the bot sends, made with real data by <code>scripts/make_preview.py</code>.</sub>
 
-> **Status:** the MVP (Phases 0-2) is done, plus the crest and flag modes of Phase 3 and the image cards of Phase 4. Next: player trivia, alerts and running it 24/7. See [ROADMAP.md](ROADMAP.md).
+> **Status:** the MVP (Phases 0-2) is done, plus the crest and flag modes of Phase 3 and the image cards of Phase 4, all in the bot's own look. Next: player trivia, alerts and running it 24/7. See [ROADMAP.md](ROADMAP.md).
 
 ---
 
 ## What it does
 
-### ⚽ Football info
+### Football info
 | Command | What you get |
 |---|---|
-| `/matches [league] [date]` | The day's matches, one embed per league in its color, winners in bold |
+| `/matches [league] [date]` | The day's matches in one compact message, a section per league, winners in bold |
 | `/live [league]` | Matches being played right now (free data is a few minutes behind) |
-| `/standings <league>` | **Image card** of the table: crests, a color per zone (Champions League, relegation...) and the legend |
-| `/team <team>` | **Image card** in the club's color: crest, stadium, coach, W/D/L form and the next match as a "versus" |
+| `/standings <league>` | **Image card** of the table: crests, positions colored by zone (Champions League, relegation...) and the leader on top |
+| `/team <team>` | **Image card**: crest, stadium, coach, W/D/L form, last result and the next match as a "versus", plus a link to the club's website |
 | `/leagues` | The 13 supported competitions and their codes |
 
 Leagues, teams and dates have autocomplete. Data covers the 13 competitions of football-data.org's free plan: the top 5 European leagues, Eredivisie, Primeira Liga, Championship, Brasileirão, Champions League, Copa Libertadores, World Cup and Euro.
 
-### 🧩 Trivia
+### Trivia
 `/trivia start <mode> [difficulty] [rounds] [answers]` starts a game in the channel. The image gets clearer every 5 seconds; answering earlier gives more points (100 / 75 / 50 / 25), and winning rounds in a row adds a streak bonus.
 
 | Mode | You see | You guess |
@@ -42,13 +42,27 @@ Leagues, teams and dates have autocomplete. Data covers the 13 competitions of f
 - **Answers:** 4 buttons, or typed in the chat (accents, typos and nicknames like `barca`, `atleti` or `spurs` all count).
 - **Difficulty:** easy (top 5 leagues), medium (more European and Brazilian clubs), hard (Championship and Libertadores too).
 - **No repeats:** each server remembers which crests already came up, so you don't see the same one until all of them have.
+- Each round is an image card with the question and the points still up for grabs; the answer is revealed on another card with the club, its country and league, and who got it.
 - `/trivia hint` gives a private hint (costs points), `/trivia stop` ends the game, and every game ends with a **podium** with the players' avatars.
 - `/leaderboard [mode]`: the server ranking as an image card.
 
-### 🛠️ Utilities
-`/help` (commands by category), `/ping` (latency and API status).
+### Utilities
+`/help` (commands by category, `/help <command>` for its options) and `/ping` (Discord latency, football API status and quota).
 
 The full catalog, including what is planned, is in [COMMANDS.md](COMMANDS.md).
+
+---
+
+## Look
+
+Everything the bot sends follows its logo: a blue ball breaking into fragments on black.
+
+- **Cards** (standings, team, trivia rounds, answers, podium, leaderboard) are drawn by the bot with Pillow: flat black, one electric blue (`#0B96FE`), square corners, the logo as a mark in the header and its fragments as decoration.
+- **Crests are stickers**: a light outline that follows their shape, so dark crests (Juventus, Newcastle) still show on black.
+- **Text is sized for phones**, where Discord shrinks images to about 400 px wide.
+- **Messages** all start with the logo and their section (`FootballTrivia · Matches`), use the same blue, keep emojis to flags and 🔴 for live, and never repeat what the image already shows.
+
+To change the look, start with the palette at the top of [`footballbot/imaging/draw.py`](footballbot/imaging/draw.py); [GUIA.md](GUIA.md) explains where each card lives.
 
 ---
 
