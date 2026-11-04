@@ -30,7 +30,6 @@ from footballbot.imaging.draw import (
     hex_texture,
     logo,
     paste,
-    shards,
     tile,
     to_png,
     truncate,
@@ -75,7 +74,7 @@ GROUP_TITLE_H = 52
 LEGEND_LINE_H = 40
 FOOTER_H = 50
 # Centro de cada columna de números
-STAT_X = {"P": 600, "W": 648, "D": 696, "L": 744, "GD": 802, "PTS": 860}
+STAT_X = {"P": 590, "W": 642, "D": 694, "L": 746, "GD": 806, "PTS": 864}
 
 
 def standings_card(
@@ -88,7 +87,8 @@ def standings_card(
 ) -> bytes:
     """La tabla como imagen: cabecera con el logo, filas con escudo y franja de zona, leyenda."""
     total_rows = sum(len(g.rows) for g in groups)
-    row_h = 46 if total_rows <= 24 else 40
+    # Filas altas y letra grande: Discord encoge la imagen a ~400 px de ancho en el celular
+    row_h = 52 if total_rows <= 24 else 42
     group_titles = sum(1 for g in groups if g.title)
     legend_lines = _legend_lines(legend)
     height = (
@@ -107,7 +107,7 @@ def standings_card(
 
     # Títulos de las columnas
     y = HEADER_H
-    label_font = font("text", 17, "SemiBold")
+    label_font = font("text", 18, "SemiBold")
     middle = y + COLUMNS_H // 2
     draw.text((62, middle), "#", font=label_font, fill=MUTED, anchor="mm")
     draw.text((140, middle), "TEAM", font=label_font, fill=MUTED, anchor="lm")
@@ -115,9 +115,10 @@ def standings_card(
         draw.text((x, middle), label, font=label_font, fill=MUTED, anchor="mm")
     y += COLUMNS_H
 
-    name_font = font("text", 24 if row_h > 40 else 22, "SemiBold")
-    stat_font = font("text", 22 if row_h > 40 else 20, "Regular")
-    pts_font = font("text", 24 if row_h > 40 else 22, "Bold")
+    big = row_h > 42
+    name_font = font("text", 27 if big else 23, "SemiBold")
+    stat_font = font("text", 25 if big else 21, "Regular")
+    pts_font = font("text", 28 if big else 23, "Bold")
     for group in groups:
         if group.title:
             draw.rectangle((24, y + 18, 30, y + GROUP_TITLE_H - 10), fill=BLUE)
@@ -159,19 +160,22 @@ def _table_row(
     if even:
         draw.rectangle((24, y, WIDTH - 24, y + row_h - 1), fill=PANEL)
     if row.zone_color:
-        # Franja fina a la izquierda: dice la zona (Champions, descenso...)
-        draw.rectangle((24, y, 28, y + row_h - 1), fill=row.zone_color)
-    draw.text((62, middle), str(row.position), font=stat_font, fill=TEXT, anchor="mm")
-    # Cuadro claro detrás del escudo: así se ven los escudos oscuros sobre el negro
-    side = row_h - 14
-    tile(canvas, row.crest, (90, middle - side // 2, 90 + side, middle + side // 2))
-    draw.text((140, middle), truncate(row.name, name_font, 420), font=name_font, fill=TEXT,
+        # Franja a la izquierda: dice la zona (Champions, descenso...)
+        draw.rectangle((24, y, 30, y + row_h - 1), fill=row.zone_color)
+    # El puesto en el color de su zona: se ve de un vistazo quién entra en Champions o baja
+    position_font = font("title", 26 if row_h > 42 else 22, "SemiBold")
+    draw.text((62, middle), str(row.position), font=position_font, fill=row.zone_color or MUTED,
+              anchor="mm")  # fmt: skip
+    # El escudo como sticker (borde claro con su forma): se ven también los oscuros
+    side = row_h - 10
+    tile(canvas, row.crest, (88, middle - side // 2, 88 + side, middle + side // 2))
+    draw.text((142, middle), truncate(row.name, name_font, 400), font=name_font, fill=TEXT,
               anchor="lm")  # fmt: skip
     gd = f"{row.goal_difference:+d}" if row.goal_difference else "0"
     stats = {"P": row.played, "W": row.won, "D": row.draw, "L": row.lost, "GD": gd}
     for label, value in stats.items():
         draw.text((STAT_X[label], middle), str(value), font=stat_font, fill=MUTED, anchor="mm")
-    draw.text((STAT_X["PTS"], middle), str(row.points), font=pts_font, fill=BLUE, anchor="mm")
+    draw.text((STAT_X["PTS"], middle), str(row.points), font=pts_font, fill=TEXT, anchor="mm")
 
 
 def _legend_lines(legend: Sequence[tuple[RGB, str]]) -> list[list[tuple[RGB, str]]]:
@@ -220,8 +224,6 @@ def team_card(
     canvas = Image.new("RGBA", (WIDTH, height), (*BLACK, 255))
     # El logo del bot, grande y muy tenue, saliendo por la esquina de abajo a la derecha
     paste(canvas, logo(560, opacity=0.09), (WIDTH - 420, height - 330))
-    # Fragmentos del logo saliendo por la esquina de arriba
-    paste(canvas, shards(96, opacity=0.9), (WIDTH - 120, 22))
     draw = ImageDraw.Draw(canvas)
 
     tile(canvas, crest, (44, 44, 290, 290), border=BLUE)
@@ -232,16 +234,26 @@ def team_card(
 
     y = 190
     for label, value in facts[:4]:
-        draw.text((332, y), label.upper(), font=font("text", 16, "SemiBold"), fill=MUTED,
+        draw.text((332, y), label.upper(), font=font("text", 17, "SemiBold"), fill=MUTED,
                   anchor="lm")  # fmt: skip
-        value_font = font("text", 22, "SemiBold")
+        value_font = font("text", 24, "SemiBold")
         draw.text((500, y), truncate(value, value_font, 370), font=value_font, fill=TEXT,
                   anchor="lm")  # fmt: skip
-        y += 37
+        y += 38
 
     # Separador: línea fina con un tramo azul
     draw.rectangle((40, 336, WIDTH - 40, 337), fill=LINE)
     draw.rectangle((40, 335, 160, 338), fill=BLUE)
+
+    if not form and not next_match:
+        # Sin partidos en el plan gratis (ligas que no cubre, como la argentina): un solo aviso
+        # en vez de dos columnas vacías
+        draw.text((WIDTH // 2, 446), "No recent or upcoming matches in our free data",
+                  font=font("text", 24, "SemiBold"), fill=MUTED, anchor="mm")  # fmt: skip
+        draw.text((WIDTH // 2, 482), "Try a club from the top European leagues or Brazil",
+                  font=font("text", 19), fill=(90, 99, 116), anchor="mm")  # fmt: skip
+        _footer(draw, height)
+        return to_png(canvas)
 
     # Racha: cuadrados rectos (ganó azul, empató gris, perdió rojo apagado)
     draw.text((40, 380), "FORM", font=font("title", 24, "SemiBold"), fill=MUTED, anchor="lm")
@@ -255,16 +267,22 @@ def team_card(
     else:
         draw.text((40, 433), "No recent matches", font=font("text", 22), fill=MUTED, anchor="lm")
     if last_result:
-        draw.text((40, 494), truncate(f"Last: {last_result}", font("text", 20), 420),
-                  font=font("text", 20), fill=MUTED, anchor="lm")  # fmt: skip
+        # "Santander 0-3 Real Madrid · Sun 01 Nov": el resultado arriba, la fecha abajo
+        result, _, when = last_result.partition(" · ")
+        result_font = font("text", 22, "SemiBold")
+        draw.text((40, 498), truncate(result, result_font, 420), font=result_font, fill=TEXT,
+                  anchor="lm")  # fmt: skip
+        if when:
+            draw.text((40, 528), f"Last match · {when}", font=font("text", 18), fill=MUTED,
+                      anchor="lm")  # fmt: skip
 
     # Próximo partido estilo "versus": los dos escudos en cuadros claros
     draw.text((500, 380), "NEXT MATCH", font=font("title", 24, "SemiBold"), fill=MUTED,
               anchor="lm")  # fmt: skip
     if next_match:
-        for crest_bytes, x in ((next_match.home_crest, 545), (next_match.away_crest, 800)):
-            tile(canvas, crest_bytes, (x - 38, 410, x + 38, 486))
-        draw.text((672, 448), "VS", font=font("title", 38, "Bold"), fill=BLUE, anchor="mm")
+        for crest_bytes, x in ((next_match.home_crest, 548), (next_match.away_crest, 800)):
+            tile(canvas, crest_bytes, (x - 44, 404, x + 44, 492))
+        draw.text((674, 448), "VS", font=font("title", 40, "Bold"), fill=BLUE, anchor="mm")
         where = "vs" if next_match.home else "at"
         line_font = font("text", 22, "SemiBold")
         draw.text((672, 522), truncate(f"{where} {next_match.opponent}", line_font, 380),

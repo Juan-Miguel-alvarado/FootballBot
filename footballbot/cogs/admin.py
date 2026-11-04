@@ -9,8 +9,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from footballbot.bot import FootballBot
+from footballbot.bot import ERROR_COLOR, FootballBot
 from footballbot.cogs.common import COLOR, MAX_CHOICES, branded
+from footballbot.errors import UserFacingError
 from footballbot.providers.base import ProviderError
 
 
@@ -28,22 +29,25 @@ class Admin(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         # latency: tiempo de ida y vuelta con Discord, en segundos.
         latency_ms = self.bot.latency * 1000
-        embed = discord.Embed(title="Pong", color=_latency_color(latency_ms))
-        embed.add_field(name="Discord", value=f"{latency_ms:.0f} ms")
+        # Tres datos en columnas: Discord, la API de fútbol y el autocompletado
+        embed = discord.Embed(color=_latency_color(latency_ms))
+        embed.add_field(name="Discord", value=f"**{latency_ms:.0f}** ms")
         try:
             health = await self.bot.football.api_status()
         except ProviderError as e:
-            embed.add_field(name="football-data.org", value=f"Error: {e}", inline=False)
-            embed.color = discord.Color.from_rgb(214, 69, 69)
+            embed.title = "Football data is unreachable"
+            embed.description = f"-# {e}"
+            embed.add_field(name="Football data", value="Down")
+            embed.color = ERROR_COLOR
         else:
-            parts = ["OK"]
-            if health.last_latency_ms is not None:
-                parts.append(f"{health.last_latency_ms:.0f} ms")
+            embed.title = "All systems normal" if latency_ms < 400 else "Discord is slow right now"
+            api = f"**{health.last_latency_ms:.0f}** ms" if health.last_latency_ms else "OK"
+            embed.add_field(name="Football data", value=api)
             if health.requests_left is not None:
-                parts.append(f"{health.requests_left} requests left this minute")
-            embed.add_field(name=health.name, value=" · ".join(parts), inline=False)
-        embed.add_field(name="Teams indexed", value=str(self.bot.football.indexed_teams))
-        branded(embed, self.bot)
+                quota = f"**{health.requests_left}**/10 this minute"
+                embed.add_field(name="API quota", value=quota)
+        embed.add_field(name="Teams indexed", value=f"**{self.bot.football.indexed_teams}**")
+        branded(embed, self.bot, "Status")
         # Después de un defer se responde con followup.send (no con response.send_message).
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -57,29 +61,38 @@ class Admin(commands.Cog):
             # /help <command>: detalle de un comando con sus opciones.
             match = next((c for c in commands_ if c.qualified_name == command.lstrip("/")), None)
             if match is None:
-                await interaction.response.send_message(
-                    f"There is no `/{command}` command.", ephemeral=True
-                )
-                return
-            embed = discord.Embed(title=_usage(match), description=match.description, color=COLOR)
-            for param in match.parameters:
-                embed.add_field(name=param.display_name, value=param.description, inline=False)
-        else:
-            # /help: todos los comandos, por categorías (cada cog es una, ver CATEGORIES)
+                raise UserFacingError(f"There is no `/{command}` command. See `/help`.")
+            # /help <command>: para qué sirve, cómo se escribe y cada opción
             embed = discord.Embed(
-                title="FootballTrivia commands",
-                description="Football info, crest trivia and more. "
-                "`<required>` `[optional]` · `/help <command>` for details.",
+                title=f"/{match.qualified_name}", description=match.description, color=COLOR
+            )
+            embed.add_field(name="Usage", value=f"`{_usage(match)}`", inline=False)
+            if match.parameters:
+                options = [
+                    f"`{p.display_name}`{'' if p.required else ' (optional)'} · {p.description}"
+                    for p in match.parameters
+                ]
+                embed.add_field(name="Options", value="\n".join(options), inline=False)
+        else:
+            # /help: solo el nombre de cada comando y para qué sirve, por categorías.
+            # Las opciones de cada uno están en /help <command> (así ninguna línea se parte).
+            embed = discord.Embed(
+                title="Commands",
+                description="Football info and crest trivia for your server.",
                 color=COLOR,
             )
             by_category: dict[str, list[str]] = {}
             for c in commands_:
                 category = CATEGORIES.get(type(c.binding).__name__, "Utilities")
-                by_category.setdefault(category, []).append(f"`{_usage(c)}` · {c.description}")
+                by_category.setdefault(category, []).append(
+                    f"`/{c.qualified_name}` {c.description}"
+                )
             for category in sorted(by_category, key=_category_order):
                 embed.add_field(name=category, value="\n".join(by_category[category]), inline=False)
-            embed.set_footer(text="Try /standings league:PL or /trivia start")
-        await interaction.response.send_message(embed=branded(embed, self.bot), ephemeral=True)
+            embed.set_footer(text="/help <command> shows its options")
+        await interaction.response.send_message(
+            embed=branded(embed, self.bot, "Help"), ephemeral=True
+        )
 
     @help.autocomplete("command")
     async def _help_autocomplete(

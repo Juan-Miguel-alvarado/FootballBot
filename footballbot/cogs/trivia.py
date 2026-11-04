@@ -33,7 +33,6 @@ from footballbot.imaging.effects import render_stage
 from footballbot.imaging.loader import ImageDownloadError
 from footballbot.models import Question, TriviaItem
 from footballbot.services.trivia.dataset import TriviaDataset, load_dataset
-from footballbot.services.trivia.matching import simplify
 from footballbot.services.trivia.modes import (
     DIFFICULTIES,
     MODES,
@@ -153,7 +152,7 @@ class Trivia(commands.Cog):
         self.games[channel.id] = session
         self.players[channel.id] = {}
         await interaction.response.send_message(
-            embed=branded(_start_embed(session, interaction.user), self.bot)
+            embed=branded(_start_embed(session, interaction.user), self.bot, "Trivia")
         )
 
         task = asyncio.create_task(self._run_game(session, picker, channel))
@@ -216,7 +215,7 @@ class Trivia(commands.Cog):
             )
         else:
             embed.description = "No games yet. Start one with `/trivia start`."
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=branded(embed, self.bot, "Leaderboard"))
             return
 
         # Tarjeta con avatares (issue #11); si falla, queda el texto de arriba
@@ -245,10 +244,13 @@ class Trivia(commands.Cog):
             )
             file = discord.File(io.BytesIO(png), filename="leaderboard.png")
             embed.set_image(url="attachment://leaderboard.png")
+            # La tarjeta ya tiene la lista: el texto queda solo como resumen
+            leader = rows[0]
+            embed.description = f"<@{leader.user_id}> leads with **{leader.points:,}** points."
         except Exception:
             log.exception("Could not draw the leaderboard card")
         await interaction.followup.send(
-            embed=branded(embed, self.bot), **({"file": file} if file else {})
+            embed=branded(embed, self.bot, "Leaderboard"), **({"file": file} if file else {})
         )
 
     async def _resolve_user(self, guild: discord.Guild, user_id: int) -> tuple[str, bytes | None]:
@@ -331,7 +333,7 @@ class Trivia(commands.Cog):
         while True:
             png = await asyncio.to_thread(_round_png, crest, session)
             file = _image_file(png, session)
-            embed = _round_embed(session)
+            embed = branded(_round_embed(session), self.bot, "Trivia")
             if message is None:
                 kwargs = {"view": view} if view else {}
                 message = await channel.send(embed=embed, file=file, **kwargs)
@@ -354,7 +356,7 @@ class Trivia(commands.Cog):
         kwargs = {"view": view.reveal()} if view else {}
         await _edit_quietly(
             message,
-            embed=_reveal_embed(session),
+            embed=branded(_reveal_embed(session), self.bot, "Trivia"),
             attachments=[_image_file(png, session, "answer")],
             **kwargs,
         )
@@ -375,7 +377,7 @@ class Trivia(commands.Cog):
             except Exception as e:
                 log.exception("Could not save trivia game")
                 await self.bot.report_error("Saving a trivia game", e)
-        embed = branded(_summary_embed(session), self.bot)
+        embed = branded(_summary_embed(session), self.bot, "Trivia")
         file = None
         if ranking := session.ranking():
             # Podio con avatares (issue #11); si falla, queda el resumen en texto
@@ -516,6 +518,7 @@ def _round_png(crest: bytes, session: GameSession) -> bytes:
             title=mode.title,
             stage=session.stage,
             points=STAGE_POINTS,
+            prompt=mode.prompt,
         )
     except Exception:
         log.exception("Could not draw the round card")
@@ -543,6 +546,7 @@ def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> 
             subtitle=subtitle,
             headline=headline,
             success=success,
+            label=f"Round {session.round}/{session.total_rounds} · Answer",
         )
     except Exception:
         log.exception("Could not draw the reveal card")
@@ -571,9 +575,9 @@ def _rank_label(index: int) -> str:
 def _outcome_text(outcome: Outcome, points: int) -> str:
     match outcome:
         case Outcome.CORRECT:
-            return f"Correct! +{points} points"
+            return f"**Correct!** +{points} points"
         case Outcome.WRONG:
-            return "Wrong. You're out for this round."
+            return "**Wrong.** You're out for this round."
         case Outcome.ALREADY_TRIED:
             return "You already answered this round."
         case Outcome.CLOSED:
@@ -581,88 +585,90 @@ def _outcome_text(outcome: Outcome, points: int) -> str:
 
 
 def _start_embed(session: GameSession, user: discord.abc.User) -> discord.Embed:
-    how = "buttons" if session.answer_mode is AnswerMode.BUTTONS else "typing in the chat"
-    points = " / ".join(str(p) for p in STAGE_POINTS)
+    """El anuncio de la partida: qué modo es y las reglas en tres columnas cortas."""
+    how = "Buttons" if session.answer_mode is AnswerMode.BUTTONS else "Typed in chat"
     embed = discord.Embed(
-        title=f"Trivia · {session.mode.title}",
-        description=(
-            f"{user.mention} started a game: **{session.total_rounds}** rounds, "
-            f"**{session.difficulty}** difficulty, answers by **{how}**.\n\n"
-            f"The image gets clearer every {STAGE_SECONDS} seconds. "
-            f"Answer early for more points ({points}), plus a bonus for winning rounds in a row."
-            f"\n\nFirst round in {START_DELAY} seconds..."
-        ),
+        title=session.mode.title,
+        description=f"{user.mention} started a game. First round in **{START_DELAY}** seconds.",
         color=COLOR,
     )
-    embed.set_footer(text="/trivia stop ends the game")
+    embed.add_field(name="Rounds", value=f"**{session.total_rounds}**")
+    embed.add_field(name="Difficulty", value=session.difficulty.title())
+    embed.add_field(name="Answers", value=how)
+    points = " · ".join(str(p) for p in STAGE_POINTS)
+    embed.add_field(
+        name="Scoring",
+        value=f"The image gets clearer every {STAGE_SECONDS} s: **{points}** points, "
+        "+10 for each round won in a row.",
+        inline=False,
+    )
+    embed.set_footer(text="/trivia hint for a clue · /trivia stop to end the game")
     return embed
 
 
 def _round_embed(session: GameSession) -> discord.Embed:
+    """La ronda: la tarjeta ya dice el número, el modo, la pregunta y los puntos."""
     how = (
-        "Pick a button."
+        "Pick the right club below."
         if session.answer_mode is AnswerMode.BUTTONS
-        else "Type the answer in the chat."
+        else ("Type the answer in the chat.")
     )
-    # Barra de tiempo: un cuadro lleno por cada etapa que queda
-    left = session.stages - session.stage
-    time_bar = "■" * left + "□" * session.stage
-    embed = discord.Embed(
-        title=f"Round {session.round}/{session.total_rounds} · {_round_mode(session).prompt}",
-        description=f"{how}\n{time_bar}",
-        color=COLOR,
-    )
+    if _round_mode(session).kind == "club-country" or session.mode.pool == "countries":
+        how = how.replace("club", "country")
+    embed = discord.Embed(description=how, color=COLOR)
     embed.set_image(url=f"attachment://trivia-{session.round}-{session.stage}.png")
     embed.set_footer(
-        text=f"Stage {session.stage + 1}/{session.stages} · "
-        f"{STAGE_POINTS[session.stage]} points now"
+        text=f"{STAGE_POINTS[session.stage]} points right now · /trivia hint for a clue"
     )
     return embed
 
 
 def _reveal_embed(session: GameSession) -> discord.Embed:
+    """La respuesta: quién acertó y el top 3 de la partida hasta ahora."""
     assert session.question is not None
-    answer = session.question.answer
-    name = answer.name
-    # El nombre completo solo se añade si dice algo más: "Brentford (Brentford FC)" no aporta
-    if simplify(answer.name) not in simplify(answer.full_name):
-        name += f" ({answer.full_name})"
     if session.winner is not None:
         # La última respuesta guardada es la que ganó la ronda
         points = session.answers[-1].points
-        embed = discord.Embed(
-            title=name,
-            description=f"<@{session.winner}> got it! **+{points}** points",
-            color=COLOR,
-        )
+        embed = discord.Embed(description=f"<@{session.winner}> got it · **+{points}**",
+                              color=COLOR)  # fmt: skip
     else:
-        reason = "Game stopped." if session.stopped else "Nobody got it."
-        embed = discord.Embed(title=name, description=reason, color=discord.Color.dark_grey())
+        reason = "Game stopped." if session.stopped else "Nobody got this one."
+        embed = discord.Embed(description=reason, color=discord.Color.dark_grey())
     embed.set_image(url=f"attachment://trivia-{session.round}-answer.png")
     top = session.ranking()[:3]
     if top:
         embed.add_field(
-            name="Scores",
+            name="Top 3",
             value="\n".join(
-                f"{_rank_label(i)} <@{p.user_id}> · {p.points}" for i, p in enumerate(top)
+                f"{_rank_label(i)} <@{p.user_id}> **{p.points}**" for i, p in enumerate(top)
             ),
         )
-    embed.set_footer(text=f"Round {session.round}/{session.total_rounds}")
+    left = session.total_rounds - session.round
+    embed.set_footer(
+        text=f"Next round in {BETWEEN_ROUNDS} s · {left} to go"
+        if left and not session.stopped
+        else "Last round"
+    )
     return embed
 
 
 def _summary_embed(session: GameSession) -> discord.Embed:
+    """El final: la clasificación de la partida (el podio va en la imagen)."""
     embed = discord.Embed(title="Game over", color=COLOR)
     ranking = session.ranking()
     if ranking:
-        embed.description = "\n".join(
-            f"{_rank_label(i)} <@{p.user_id}> · **{p.points}** pts · {p.correct} correct · "
-            f"best streak {p.best_streak}"
-            for i, p in enumerate(ranking)
-        )
+        winner = ranking[0]
+        lines = [f"<@{winner.user_id}> wins with **{winner.points}** points."]
+        lines += [
+            f"{_rank_label(i)} <@{p.user_id}> **{p.points}** · {p.correct} correct"
+            + (f" · streak {p.best_streak}" if p.best_streak > 1 else "")
+            for i, p in enumerate(ranking[:10])
+        ]
+        embed.description = "\n".join(lines)
     else:
-        embed.description = "Nobody scored this time."
-    embed.set_footer(text=f"{session.round} rounds played · /leaderboard for the server ranking")
+        embed.description = "Nobody scored this time. Try an easier difficulty?"
+    rounds = "round" if session.round == 1 else "rounds"
+    embed.set_footer(text=f"{session.round} {rounds} · /leaderboard for the server ranking")
     return embed
 
 

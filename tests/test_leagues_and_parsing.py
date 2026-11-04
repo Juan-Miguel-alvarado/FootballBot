@@ -147,22 +147,34 @@ def _group(code: str, count: int):
 def test_league_embeds_respect_discord_limits() -> None:
     from zoneinfo import ZoneInfo
 
-    from footballbot.cogs.common import MAX_EMBED_CHARS, MAX_EMBEDS_PER_MESSAGE
+    from footballbot.cogs.common import MAX_EMBEDS_PER_MESSAGE, MAX_FIELDS
     from footballbot.cogs.info import _league_embeds
 
     codes = ["PL", "PD", "SA", "BL1", "FL1", "DED", "PPL", "ELC", "BSA", "CL", "CLI", "WC", "EC"]
     groups = [_group(code, 12) for code in codes]
-    batches = _league_embeds(groups, ZoneInfo("UTC"), title="Matches", color=discord.Color.green(),
-                             empty="none", footer="footer")  # fmt: skip
+    batches = _league_embeds(groups, ZoneInfo("UTC"), title="Matches", empty="none",
+                             footer="footer")  # fmt: skip
     embeds = [e for batch in batches for e in batch]
-    assert len(embeds) == 1 + len(codes)  # cabecera + una por liga
-    assert len(batches) >= 2
+    # Una sección (campo) por liga, repartidas en los embeds que hagan falta
+    assert sum(len(e.fields) for e in embeds) == len(codes)
     for batch in batches:
         assert len(batch) <= MAX_EMBEDS_PER_MESSAGE
-        assert sum(len(e) for e in batch) <= MAX_EMBED_CHARS
-    assert embeds[0].description == "**156** matches in **13** competitions"
-    assert embeds[1].title == "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League"
+        assert sum(len(e) for e in batch) <= 6000  # límite de Discord por mensaje
+        assert all(len(e.fields) <= MAX_FIELDS for e in batch)
+    assert embeds[0].description == "**156** matches · 13 competitions"
+    assert embeds[0].fields[0].name == "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League"
     assert embeds[-1].footer.text == "footer"
+
+
+def test_single_league_uses_its_logo_and_a_plain_section_name() -> None:
+    from zoneinfo import ZoneInfo
+
+    from footballbot.cogs.info import _league_embeds
+
+    [[embed]] = _league_embeds([_group("PL", 3)], ZoneInfo("UTC"), title="PL", empty="none",
+                               footer="f", single=True)  # fmt: skip
+    assert embed.description == "**3** matches"
+    assert embed.fields[0].name == "Fixtures"
 
 
 def test_finished_match_shows_the_winner_in_bold() -> None:
@@ -171,7 +183,7 @@ def test_finished_match_shows_the_winner_in_bold() -> None:
     from footballbot.cogs.info import _match_line
 
     line = _match_line(_group("PL", 1).matches[0], ZoneInfo("UTC"))
-    assert line == "`   FT` **Arsenal** 2-1 Chelsea"
+    assert line == "`   FT` **Arsenal** 2\u20131 Chelsea"
 
 
 def test_leagues_by_region() -> None:

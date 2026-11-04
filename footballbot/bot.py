@@ -22,6 +22,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from footballbot.cogs.common import branded
 from footballbot.config import Settings
 from footballbot.errors import UserFacingError
 from footballbot.imaging.loader import ImageLoader
@@ -189,6 +190,7 @@ class FootballBot(commands.Bot):
     async def _reply_error(self, interaction: discord.Interaction, message: str) -> None:
         """Responde el error al usuario en un embed rojo apagado. ephemeral=True: solo él lo ve."""
         embed = discord.Embed(description=message, color=ERROR_COLOR)
+        branded(embed, self)  # la misma cabecera con el logo que el resto de mensajes
         try:
             # Si el comando ya hizo defer() (el "FootballTrivia is thinking..."), hay que
             # responder con followup; si no, con response.send_message.
