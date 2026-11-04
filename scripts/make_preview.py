@@ -68,11 +68,16 @@ def trivia_round(
         stage_image = render_stage(image, mode.effect, mode.levels[stage], seed=round_no)
         card = trivia_cards.round_card(
             stage_image=stage_image, round_no=round_no, total_rounds=10, title=mode.title,
-            stage=stage, points=STAGE_POINTS,
+            stage=stage, points=STAGE_POINTS, prompt=mode.prompt,
         )  # fmt: skip
         frames.append((frame(card), STAGE_MS))
     reveal = trivia_cards.reveal_card(
-        crest=image, name=name, subtitle=subtitle, headline=headline, success=True
+        crest=image,
+        name=name,
+        subtitle=subtitle,
+        headline=headline,
+        success=True,
+        label=f"Round {round_no}/10 · Answer",
     )
     frames.append((frame(reveal), CARD_MS))
     return frames

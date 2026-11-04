@@ -114,15 +114,17 @@ def parse_league(value: str | None) -> League | None:
 # --- embeds ----------------------------------------------------------------------------------
 
 
-def branded(embed: discord.Embed, client: discord.Client) -> discord.Embed:
-    """Pone el logo del bot (su avatar) y "FootballTrivia" en el pie del embed.
+def branded(
+    embed: discord.Embed, client: discord.Client, section: str | None = None
+) -> discord.Embed:
+    """Cabecera del mensaje con el logo del bot (su avatar): "FootballTrivia · Standings".
 
-    Si el embed ya tenía pie ("Matchday 9"), lo mantiene: "Matchday 9 · FootballTrivia".
+    Todos los mensajes del bot empiezan igual, como un canal de TV con su mosca: así se
+    reconocen de un vistazo. El pie queda libre para la información del mensaje.
     """
     user = client.user
-    text = embed.footer.text
-    embed.set_footer(
-        text=f"{text} · {BRAND_NAME}" if text else BRAND_NAME,
+    embed.set_author(
+        name=f"{BRAND_NAME} · {section}" if section else BRAND_NAME,
         icon_url=user.display_avatar.url if user else None,
     )
     return embed

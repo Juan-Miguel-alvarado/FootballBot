@@ -140,7 +140,7 @@ def test_round_and_reveal_cards() -> None:
                 points=(100, 75, 50, 25),
             )
         )
-        assert size == (tc.WIDTH, 680)
+        assert size == (tc.WIDTH, 740)
     for success in (True, False):
         size = png_size(
             tc.reveal_card(
@@ -187,7 +187,7 @@ def test_logo_has_a_transparent_background() -> None:
     assert shards(80).width == 80
 
 
-def test_branded_footer_keeps_the_text_and_adds_the_logo() -> None:
+def test_branded_header_has_the_logo_and_the_section() -> None:
     import discord
 
     from footballbot.cogs.common import branded
@@ -195,9 +195,7 @@ def test_branded_footer_keeps_the_text_and_adds_the_logo() -> None:
     client = SimpleNamespace(
         user=SimpleNamespace(display_avatar=SimpleNamespace(url="https://x/a.png"))
     )
-    embed = discord.Embed(title="t")
-    embed.set_footer(text="Matchday 9")
-    branded(embed, client)
-    assert embed.footer.text == "Matchday 9 · FootballTrivia"
-    assert embed.footer.icon_url == "https://x/a.png"
-    assert branded(discord.Embed(), client).footer.text == "FootballTrivia"
+    embed = branded(discord.Embed(title="t"), client, "Standings")
+    assert embed.author.name == "FootballTrivia · Standings"
+    assert embed.author.icon_url == "https://x/a.png"
+    assert branded(discord.Embed(), client).author.name == "FootballTrivia"

@@ -217,21 +217,44 @@ def brand(canvas: Image.Image, right: int, top: int, size: int = 64) -> None:
     paste(canvas, mark, (right - mark.width, top))
 
 
+def sticker(data: bytes | None, size: int, stroke: int = 0) -> Image.Image | None:
+    """El escudo como "sticker": recortado a su forma, con un borde claro alrededor.
+
+    El borde sigue el contorno del escudo (no es un cuadro ni un círculo), así se ven también
+    los escudos negros sobre el fondo negro, y todos quedan con el mismo look de cromo.
+    `size` es el lado total, borde incluido. `stroke` = grosor del borde (0 = automático).
+    """
+    stroke = stroke or max(2, size // 24)
+    icon = load_icon(data, size - 2 * stroke)
+    if icon is None:
+        return None
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    alpha = Image.new("L", (size, size), 0)
+    alpha.paste(icon.getchannel("A").point(lambda a: 255 if a > 60 else 0), (stroke, stroke))
+    # Engordar la silueta `stroke` píxeles = el borde
+    outline = alpha.filter(ImageFilter.MaxFilter(2 * stroke + 1))
+    canvas.paste((236, 239, 244, 255), (0, 0), outline)
+    canvas.alpha_composite(icon, (stroke, stroke))
+    return canvas
+
+
 def tile(
     canvas: Image.Image,
     data: bytes | None,
     box: tuple[int, int, int, int],
     border: RGB | None = None,
-    fill: RGB = (236, 239, 244),
 ) -> None:
-    """Escudo o logo sobre un cuadro claro de esquinas rectas (se ven también los oscuros)."""
-    draw = ImageDraw.Draw(canvas)
-    if border:
-        draw.rectangle((box[0] - 3, box[1] - 3, box[2] + 3, box[3] + 3), fill=border)
-    draw.rectangle(box, fill=fill)
+    """Pega el escudo como sticker centrado en `box`. `border`: un aro de color detrás."""
     side = min(box[2] - box[0], box[3] - box[1])
-    icon = load_icon(data, round(side * 0.82))
-    paste_icon(canvas, icon, ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2))
+    center = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
+    if border:
+        draw = ImageDraw.Draw(canvas)
+        r = side // 2 + 8
+        draw.ellipse((center[0] - r, center[1] - r, center[0] + r, center[1] + r), outline=border,
+                     width=3)  # fmt: skip
+    icon = sticker(data, side)
+    if icon is not None:
+        canvas.alpha_composite(icon, (center[0] - side // 2, center[1] - side // 2))
 
 
 def wordmark(draw: ImageDraw.ImageDraw, xy: tuple[int, int], anchor: str = "ls") -> None:

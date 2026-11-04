@@ -21,6 +21,7 @@ from footballbot.imaging.draw import (
     LINE,
     MUTED,
     PANEL,
+    RGB,
     TEXT,
     avatar,
     brand,
@@ -29,7 +30,6 @@ from footballbot.imaging.draw import (
     hex_texture,
     logo,
     paste,
-    shards,
     tile,
     to_png,
     truncate,
@@ -37,6 +37,8 @@ from footballbot.imaging.draw import (
 )
 
 WIDTH = 800
+# El 3er puesto del podio: un azul oscuro, para que se vea sobre el negro sin competir
+THIRD: RGB = (22, 46, 96)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +62,10 @@ def round_card(
     title: str,
     stage: int,
     points: Sequence[int],
+    prompt: str = "",
 ) -> bytes:
-    """Una ronda: "ROUND 3/10", la imagen con el efecto en un marco y la barra de etapas."""
-    height = 680
+    """Una ronda: "ROUND 3/10", la imagen en un marco, la pregunta y la barra de etapas."""
+    height = 740
     canvas = Image.new("RGBA", (WIDTH, height), (*BLACK, 255))
     hex_texture(canvas, (0, 0, WIDTH, 126))
     draw = ImageDraw.Draw(canvas)
@@ -79,13 +82,16 @@ def round_card(
     draw.rectangle((left - 4, top - 4, left + size + 3, top + size + 3), fill=BLUE)
     image = Image.open(io.BytesIO(stage_image)).convert("RGBA").resize((size, size))
     canvas.paste(image, (left, top))
-    # Fragmentos del logo "saliendo" del marco
-    paste(canvas, shards(70, opacity=0.95), (left + size + 14, top - 6))
 
-    # Barra de etapas: la actual en azul, las pasadas apagadas, las que vienen solo con borde
+    # La pregunta, grande, debajo de la imagen
+    if prompt:
+        prompt_font = fit_font(prompt.upper(), "title", "SemiBold", 34, WIDTH - 80, 22)
+        draw.text((WIDTH // 2, 624), prompt.upper(), font=prompt_font, fill=TEXT, anchor="mm")
+
+    # Barra de etapas: la actual en azul, las pasadas tachadas, las que vienen solo con borde
     gap = 10
     segment = (WIDTH - 72 - gap * (len(points) - 1)) // len(points)
-    y0, y1 = 614, 656
+    y0, y1 = 670, 712
     for i, value in enumerate(points):
         x0 = 36 + i * (segment + gap)
         box = (x0, y0, x0 + segment, y1)
@@ -94,7 +100,11 @@ def round_card(
             color = TEXT
         elif i < stage:
             draw.rectangle(box, fill=PANEL)
-            color = LINE
+            color = MUTED
+            # Tachado: esos puntos ya no se pueden ganar
+            mid = (y0 + y1) // 2
+            draw.line((x0 + segment // 2 - 38, mid, x0 + segment // 2 + 38, mid), fill=MUTED,
+                      width=2)  # fmt: skip
         else:
             draw.rectangle(box, outline=LINE, width=2)
             color = MUTED
@@ -113,6 +123,7 @@ def reveal_card(
     subtitle: str | None,
     headline: str,
     success: bool,
+    label: str | None = None,
 ) -> bytes:
     """La respuesta: escudo limpio, nombre, "País · Liga" y quién acertó (o que nadie)."""
     height = 600
@@ -120,11 +131,14 @@ def reveal_card(
     # El logo del bot, grande y muy tenue, saliendo por la esquina de abajo a la derecha
     paste(canvas, logo(520, opacity=0.08), (WIDTH - 360, height - 300))
     draw = ImageDraw.Draw(canvas)
-    wordmark(draw, (36, 40), anchor="lm")
+    if label:
+        draw.text((36, 40), label.upper(), font=font("title", 24, "SemiBold"), fill=BLUE,
+                  anchor="lm")  # fmt: skip
+    brand(canvas, right=WIDTH - 28, top=18, size=86)
+    wordmark(draw, (36, height - 26), anchor="lm")
 
     cx = WIDTH // 2
-    tile(canvas, crest, (cx - 130, 70, cx + 130, 330), border=BLUE)
-    paste(canvas, shards(64, opacity=0.95), (cx + 146, 64))
+    tile(canvas, crest, (cx - 125, 78, cx + 125, 328), border=BLUE)
 
     name_font = fit_font(name.upper(), "title", "Bold", 60, WIDTH - 80, 28)
     draw.text((cx, 392), name.upper(), font=name_font, fill=TEXT, anchor="mm")
@@ -152,7 +166,7 @@ def podium_card(*, title: str, subtitle: str, players: Sequence[PlayerEntry]) ->
     """Final de la partida: podio con avatares para los 3 primeros y la lista del resto."""
     rest = list(players[3:10])
     row_h = 56
-    height = 660 + (len(rest) * row_h + 30 if rest else 0)
+    height = 620 + (len(rest) * row_h + 30 if rest else 0)
     canvas = Image.new("RGBA", (WIDTH, height), (*BLACK, 255))
     paste(canvas, logo(520, opacity=0.07), (WIDTH - 380, 250))
     draw = ImageDraw.Draw(canvas)
@@ -160,16 +174,14 @@ def podium_card(*, title: str, subtitle: str, players: Sequence[PlayerEntry]) ->
 
     # Orden visual del podio: 2º a la izquierda, 1º al centro, 3º a la derecha.
     # El 1º en azul, el 2º en azul profundo y el 3º en panel con borde.
-    floor = 620
-    spots = ((1, 210, 170, BLUE_DEEP), (0, 400, 240, BLUE), (2, 590, 120, PANEL))
+    floor = 580
+    spots = ((1, 210, 170, BLUE_DEEP), (0, 400, 240, BLUE), (2, 590, 120, THIRD))
     for place, x, block_h, fill in spots:
         if place >= len(players):
             continue
         player = players[place]
         top = floor - block_h
         draw.rectangle((x - 92, top, x + 92, floor), fill=fill)
-        if fill == PANEL:
-            draw.rectangle((x - 92, top, x + 92, floor), outline=LINE, width=2)
         draw.text((x, top + 44), str(place + 1), font=font("title", 60, "Bold"), fill=TEXT,
                   anchor="mm")  # fmt: skip
         draw.text((x, top + 96), f"{player.points} PTS", font=font("title", 24, "SemiBold"),
