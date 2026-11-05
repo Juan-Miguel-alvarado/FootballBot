@@ -78,7 +78,8 @@ def test_standings_card_with_groups_and_missing_crests() -> None:
 
 def test_team_card_with_and_without_next_match() -> None:
     nxt = cards.NextMatch(crest(), None, "Barça", False, "Sun 25 Oct · 15:00", "La Liga")
-    for next_match, form in ((nxt, ["W", "D", "L"]), (None, [])):
+    # Con partidos, la tarjeta completa; sin ninguno, una más baja con un solo aviso
+    for next_match, form, height in ((nxt, ["W", "D", "L"], 660), (None, [], 470)):
         size = png_size(
             cards.team_card(
                 name="Real Madrid",
@@ -89,7 +90,7 @@ def test_team_card_with_and_without_next_match() -> None:
                 next_match=next_match,
             )
         )
-        assert size == (cards.WIDTH, 640)
+        assert size == (cards.WIDTH, height)
 
 
 def test_text_helpers() -> None:
@@ -116,9 +117,18 @@ async def test_info_cog_builds_the_standings_card_even_if_crests_fail() -> None:
         tuple(_standing_row(r) for r in data["standings"][0]["table"]),
         matchday=8,
     )
-    png = await cog._standings_image(get_league("PL"), [table])
-    assert png is not None
+    [png] = await cog._standings_image(get_league("PL"), [table])
     assert png_size(png)[0] == cards.WIDTH
+
+
+def test_long_tables_are_split_into_pages() -> None:
+    from footballbot.cogs.info import _pages
+
+    assert len(_pages([cards.TableGroup(None, rows(20, with_crest=False))])) == 1
+    pages = _pages([cards.TableGroup(None, rows(36, with_crest=False))])
+    assert [len(p[0].rows) for p in pages] == [18, 18]
+    groups = [cards.TableGroup(g, rows(4, with_crest=False)) for g in "ABCDEFGH"]
+    assert _pages(groups) == [groups]  # los grupos van juntos
 
 
 # --- tarjetas de la trivia (issue #11) ---------------------------------------------------------
@@ -151,7 +161,7 @@ def test_round_and_reveal_cards() -> None:
                 success=success,
             )
         )
-        assert size == (tc.WIDTH, 600)
+        assert size == (tc.WIDTH, 700)
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 7, 12])
@@ -185,17 +195,3 @@ def test_logo_has_a_transparent_background() -> None:
     assert image.width == 200
     assert image.getpixel((0, image.height - 1))[3] == 0  # la esquina (antes negra) es transparente
     assert shards(80).width == 80
-
-
-def test_branded_header_has_the_logo_and_the_section() -> None:
-    import discord
-
-    from footballbot.cogs.common import branded
-
-    client = SimpleNamespace(
-        user=SimpleNamespace(display_avatar=SimpleNamespace(url="https://x/a.png"))
-    )
-    embed = branded(discord.Embed(title="t"), client, "Standings")
-    assert embed.author.name == "FootballTrivia · Standings"
-    assert embed.author.icon_url == "https://x/a.png"
-    assert branded(discord.Embed(), client).author.name == "FootballTrivia"

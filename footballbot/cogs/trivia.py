@@ -19,6 +19,7 @@ import io
 import logging
 import zlib
 from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import discord
@@ -26,12 +27,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from footballbot.bot import FootballBot
-from footballbot.cogs.common import COLOR, branded
+from footballbot.cogs.common import COLOR, LOGO_URL, command_mention, logo_file, timestamp
 from footballbot.errors import UserFacingError
 from footballbot.imaging import trivia_cards
 from footballbot.imaging.effects import render_stage
 from footballbot.imaging.loader import ImageDownloadError
-from footballbot.models import Question, TriviaItem
+from footballbot.models import PlayerScore, Question, TriviaItem
 from footballbot.services.trivia.dataset import TriviaDataset, load_dataset
 from footballbot.services.trivia.modes import (
     DIFFICULTIES,
@@ -43,6 +44,7 @@ from footballbot.services.trivia.modes import (
 from footballbot.services.trivia.session import (
     HINT_COST,
     STAGE_POINTS,
+    STREAK_BONUS,
     AnswerMode,
     GameSession,
     Outcome,
@@ -152,7 +154,7 @@ class Trivia(commands.Cog):
         self.games[channel.id] = session
         self.players[channel.id] = {}
         await interaction.response.send_message(
-            embed=branded(_start_embed(session, interaction.user), self.bot, "Trivia")
+            embed=_start_embed(session, interaction.user, self.bot), file=logo_file()
         )
 
         task = asyncio.create_task(self._run_game(session, picker, channel))
@@ -215,7 +217,7 @@ class Trivia(commands.Cog):
             )
         else:
             embed.description = "No games yet. Start one with `/trivia start`."
-            await interaction.followup.send(embed=branded(embed, self.bot, "Leaderboard"))
+            await interaction.followup.send(embed=embed)
             return
 
         # Tarjeta con avatares (issue #11); si falla, queda el texto de arriba
@@ -243,15 +245,13 @@ class Trivia(commands.Cog):
                 players=players,
             )
             file = discord.File(io.BytesIO(png), filename="leaderboard.png")
-            embed.set_image(url="attachment://leaderboard.png")
-            # La tarjeta ya tiene la lista: el texto queda solo como resumen
-            leader = rows[0]
-            embed.description = f"<@{leader.user_id}> leads with **{leader.points:,}** points."
         except Exception:
             log.exception("Could not draw the leaderboard card")
-        await interaction.followup.send(
-            embed=branded(embed, self.bot, "Leaderboard"), **({"file": file} if file else {})
-        )
+        if file is None:
+            await interaction.followup.send(embed=embed)
+            return
+        # La tarjeta ya tiene la lista: el texto solo dice dónde está quien lo pidió
+        await interaction.followup.send(_your_rank(rows, players, interaction.user.id), file=file)
 
     async def _resolve_user(self, guild: discord.Guild, user_id: int) -> tuple[str, bytes | None]:
         """Nombre y avatar de un jugador (aunque ya no esté en el servidor)."""
@@ -329,16 +329,18 @@ class Trivia(commands.Cog):
             else None
         )
 
+        # La tarjeta ya dice ronda, modo, pregunta y puntos: el mensaje es solo la imagen
+        # (suelta, sin embed, así se ve más grande) y los botones
+        content = _round_text(session, self.bot)
         message: discord.Message | None = None
         while True:
             png = await asyncio.to_thread(_round_png, crest, session)
             file = _image_file(png, session)
-            embed = branded(_round_embed(session), self.bot, "Trivia")
             if message is None:
                 kwargs = {"view": view} if view else {}
-                message = await channel.send(embed=embed, file=file, **kwargs)
+                message = await channel.send(content, file=file, **kwargs)
             else:
-                await _edit_quietly(message, embed=embed, attachments=[file])
+                await _edit_quietly(message, attachments=[file])
             try:
                 # Espera a que alguien acierte (o se pare el juego) como mucho STAGE_SECONDS
                 await asyncio.wait_for(session.round_over.wait(), timeout=STAGE_SECONDS)
@@ -356,7 +358,7 @@ class Trivia(commands.Cog):
         kwargs = {"view": view.reveal()} if view else {}
         await _edit_quietly(
             message,
-            embed=branded(_reveal_embed(session), self.bot, "Trivia"),
+            content=_reveal_text(session, players),
             attachments=[_image_file(png, session, "answer")],
             **kwargs,
         )
@@ -377,12 +379,12 @@ class Trivia(commands.Cog):
             except Exception as e:
                 log.exception("Could not save trivia game")
                 await self.bot.report_error("Saving a trivia game", e)
-        embed = branded(_summary_embed(session), self.bot, "Trivia")
+        known = self.players.get(session.channel_id, {})
+        embed = _summary_embed(session)
         file = None
         if ranking := session.ranking():
             # Podio con avatares (issue #11); si falla, queda el resumen en texto
             try:
-                known = self.players.get(session.channel_id, {})
                 players = []
                 for score in ranking[:10]:
                     user = known.get(score.user_id)
@@ -395,17 +397,69 @@ class Trivia(commands.Cog):
                     )
                 png = await asyncio.to_thread(
                     trivia_cards.podium_card,
-                    title="Game over",
-                    subtitle=f"{session.mode.title} · {session.round} rounds · "
+                    title="Game stopped" if session.round < session.total_rounds else "Game over",
+                    subtitle=f"{session.mode.title} · {_rounds_played(session)} · "
                     f"{session.difficulty}",
                     players=players,
                 )
                 file = discord.File(io.BytesIO(png), filename="podium.png")
-                embed.set_image(url="attachment://podium.png")
             except Exception:
                 log.exception("Could not draw the podium card")
         self.players.pop(session.channel_id, None)
-        await _send_quietly(channel, embed=embed, **({"file": file} if file else {}))
+        # Botón para empezar otra partida igual (mismo modo, dificultad y rondas)
+        again = PlayAgainView(self, session)
+        if file:
+            # El podio ya tiene la clasificación: el texto solo dice quién ganó
+            await _send_quietly(
+                channel, _summary_text(session, known, self.bot), file=file, view=again
+            )
+        else:
+            await _send_quietly(channel, embed=embed, view=again)
+
+
+class PlayAgainView(discord.ui.View):
+    """El botón "Play again" del final: empieza otra partida con la misma configuración."""
+
+    def __init__(self, cog: "Trivia", session: GameSession) -> None:
+        super().__init__(timeout=600)  # 10 minutos; después el botón deja de responder
+        self.cog = cog
+        self.session = session
+
+    @discord.ui.button(label="Leaderboard", style=discord.ButtonStyle.secondary, row=0)
+    async def show_leaderboard(
+        self, interaction: discord.Interaction, button: discord.ui.Button["PlayAgainView"]
+    ) -> None:
+        # Lo mismo que escribir /leaderboard
+        await self.cog.leaderboard.callback(self.cog, interaction, None)
+
+    @discord.ui.button(label="Play again", style=discord.ButtonStyle.primary, row=0)
+    async def play_again(
+        self, interaction: discord.Interaction, button: discord.ui.Button["PlayAgainView"]
+    ) -> None:
+        s = self.session
+        # Lo mismo que escribir /trivia start con las opciones de la partida anterior
+        await self.cog.start.callback(
+            self.cog,
+            interaction,
+            mode=app_commands.Choice(name=s.mode.title, value=s.mode.key),
+            difficulty=app_commands.Choice(name=s.difficulty.title(), value=s.difficulty),
+            rounds=s.total_rounds,
+            answers=app_commands.Choice(name=s.answer_mode.value, value=s.answer_mode.value),
+        )
+        button.disabled = True
+        self.stop()
+        with contextlib.suppress(discord.HTTPException):
+            if interaction.message:
+                await interaction.message.edit(view=self)
+
+    async def on_error(
+        self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]
+    ) -> None:
+        # Fuera de los slash commands, los errores no pasan por bot.py: se responden aquí
+        if isinstance(error, UserFacingError):
+            await interaction.response.send_message(str(error), ephemeral=True)
+        else:
+            await super().on_error(interaction, error, item)
 
 
 class AnswerView(discord.ui.View):
@@ -438,7 +492,10 @@ class AnswerView(discord.ui.View):
         async def callback(interaction: discord.Interaction) -> None:
             self.players[interaction.user.id] = interaction.user
             outcome, points = self.session.answer(interaction.user.id, choice_id=option.id)
-            await interaction.response.send_message(_outcome_text(outcome, points), ephemeral=True)
+            score = self.session.scores.get(interaction.user.id)
+            await interaction.response.send_message(
+                _outcome_text(outcome, points, score, self.session), ephemeral=True
+            )
 
         return callback
 
@@ -504,6 +561,10 @@ def _round_seed(session: GameSession) -> int:
     return zlib.crc32(f"{subject}:{session.round}".encode())
 
 
+# Qué pasa con la imagen en la siguiente etapa, según el efecto (para la cabecera de la ronda)
+_STAGE_CUES = {"zoom": "WIDER", "silhouette": "COLOR"}
+
+
 def _round_png(crest: bytes, session: GameSession) -> bytes:
     """La ronda como tarjeta. Si la tarjeta falla, solo la imagen con el efecto (como antes)."""
     mode = _round_mode(session)
@@ -519,6 +580,8 @@ def _round_png(crest: bytes, session: GameSession) -> bytes:
             stage=session.stage,
             points=STAGE_POINTS,
             prompt=mode.prompt,
+            seconds=STAGE_SECONDS,
+            cue=_STAGE_CUES.get(mode.effect),
         )
     except Exception:
         log.exception("Could not draw the round card")
@@ -533,9 +596,10 @@ def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> 
     mode = _round_mode(session)
     # club-country: el nombre grande es el país; debajo, el club que salió en la imagen
     subtitle = shown.name if shown else answer.subtitle
+    points = None
     if session.winner is not None:
         points = session.answers[-1].points
-        headline, success = f"{winner_name or 'Someone'} got it  +{points}", True
+        headline, success = f"{winner_name or 'Someone'} got it", True
     else:
         headline = "Game stopped" if session.stopped else "Nobody got it"
         success = False
@@ -546,7 +610,8 @@ def _reveal_png(crest: bytes, session: GameSession, winner_name: str | None) -> 
             subtitle=subtitle,
             headline=headline,
             success=success,
-            label=f"Round {session.round}/{session.total_rounds} · Answer",
+            label=f"Round {session.round}/{session.total_rounds}",
+            points=points,
         )
     except Exception:
         log.exception("Could not draw the reveal card")
@@ -572,88 +637,142 @@ def _rank_label(index: int) -> str:
     return f"`{index + 1}.`"
 
 
-def _outcome_text(outcome: Outcome, points: int) -> str:
+def _outcome_text(
+    outcome: Outcome,
+    points: int,
+    score: PlayerScore | None = None,
+    session: GameSession | None = None,
+) -> str:
+    """Lo que ve solo quien hizo clic (ephemeral)."""
     match outcome:
         case Outcome.CORRECT:
-            return f"**Correct!** +{points} points"
+            details = []
+            if session:
+                details.append(f"Round {session.round} of {session.total_rounds}")
+            # El total solo si suma algo más que esta ronda (si no, repite el +75)
+            if score and score.points != points:
+                details.append(f"{score.points} points this game")
+            if score and score.streak > 1:
+                details.append(f"{score.streak} in a row")
+            text = f"✅ **Correct!** +{points} points"
+            if session and session.question:
+                text = f"✅ **Correct, it's {session.question.answer.name}!** +{points} points"
+            return text + ("\n-# " + " · ".join(details) if details else "")
         case Outcome.WRONG:
-            return "**Wrong.** You're out for this round."
+            return (
+                "❌ **Wrong.** Your answer is locked for this round.\n"
+                "-# The right one shows when the round ends."
+            )
         case Outcome.ALREADY_TRIED:
             return "You already answered this round."
         case Outcome.CLOSED:
             return "Too late, this round is over."
 
 
-def _start_embed(session: GameSession, user: discord.abc.User) -> discord.Embed:
-    """El anuncio de la partida: qué modo es y las reglas en tres columnas cortas."""
-    how = "Buttons" if session.answer_mode is AnswerMode.BUTTONS else "Typed in chat"
+def _start_embed(
+    session: GameSession, user: discord.abc.User, client: discord.Client
+) -> discord.Embed:
+    """El anuncio de la partida: modo, cuándo empieza y las reglas en tres renglones cortos."""
+    how = (
+        "Answer with the buttons"
+        if session.answer_mode is AnswerMode.BUTTONS
+        else ("Type your answers in the chat")
+    )
+    points = " / ".join(str(p) for p in STAGE_POINTS)
+    starts = timestamp(datetime.now(UTC) + timedelta(seconds=START_DELAY), "R")
     embed = discord.Embed(
-        title=session.mode.title,
-        description=f"{user.mention} started a game. First round in **{START_DELAY}** seconds.",
+        title=f"{session.mode.title} · {session.total_rounds} rounds",
+        description=(
+            f"{user.mention} started a game ({session.difficulty}). First round {starts}.\n"
+            f"- The image gets clearer every {STAGE_SECONDS} s\n"
+            f"- Answer early for more points: **{points}**\n"
+            f"- Win rounds in a row for **+{STREAK_BONUS}** more each time\n"
+            f"- {how} · {command_mention(client, 'trivia hint')} for a clue · "
+            f"{command_mention(client, 'trivia stop')} to end"
+        ),
         color=COLOR,
     )
-    embed.add_field(name="Rounds", value=f"**{session.total_rounds}**")
-    embed.add_field(name="Difficulty", value=session.difficulty.title())
-    embed.add_field(name="Answers", value=how)
-    points = " · ".join(str(p) for p in STAGE_POINTS)
-    embed.add_field(
-        name="Scoring",
-        value=f"The image gets clearer every {STAGE_SECONDS} s: **{points}** points, "
-        "+10 for each round won in a row.",
-        inline=False,
-    )
-    embed.set_footer(text="/trivia hint for a clue · /trivia stop to end the game")
+    embed.set_thumbnail(url=LOGO_URL)  # el logo del bot (va adjunto: logo_file())
     return embed
 
 
-def _round_embed(session: GameSession) -> discord.Embed:
-    """La ronda: la tarjeta ya dice el número, el modo, la pregunta y los puntos."""
-    how = (
-        "Pick the right club below."
-        if session.answer_mode is AnswerMode.BUTTONS
-        else ("Type the answer in the chat.")
-    )
-    if _round_mode(session).kind == "club-country" or session.mode.pool == "countries":
-        how = how.replace("club", "country")
-    embed = discord.Embed(description=how, color=COLOR)
-    embed.set_image(url=f"attachment://trivia-{session.round}-{session.stage}.png")
-    embed.set_footer(
-        text=f"{STAGE_POINTS[session.stage]} points right now · /trivia hint for a clue"
-    )
-    return embed
+def _round_text(session: GameSession, client: discord.Client) -> str:
+    """Debajo del nombre del bot, encima de la ronda: cada cuánto se aclara y cómo pedir pista.
+
+    Con respuestas escritas, además, qué hay que escribir.
+    """
+    hint = f"{command_mention(client, 'trivia hint')} for a clue"
+    line = f"Round {session.round} of {session.total_rounds} · {hint}"
+    if session.answer_mode is AnswerMode.BUTTONS:
+        return line
+    what = "country" if _round_mode(session).kind == "club-country" else "name"
+    if session.mode.pool == "countries":
+        what = "country"
+    return f"Type the {what} in the chat.\n{line}"
 
 
-def _reveal_embed(session: GameSession) -> discord.Embed:
-    """La respuesta: quién acertó y el top 3 de la partida hasta ahora."""
-    assert session.question is not None
-    if session.winner is not None:
-        # La última respuesta guardada es la que ganó la ronda
-        points = session.answers[-1].points
-        embed = discord.Embed(description=f"<@{session.winner}> got it · **+{points}**",
-                              color=COLOR)  # fmt: skip
-    else:
-        reason = "Game stopped." if session.stopped else "Nobody got this one."
-        embed = discord.Embed(description=reason, color=discord.Color.dark_grey())
-    embed.set_image(url=f"attachment://trivia-{session.round}-answer.png")
+def _names(players: dict[int, discord.abc.User]) -> Callable[[int], str]:
+    """Nombre visible de un jugador (sin @: no notifica a nadie)."""
+    return lambda user_id: players[user_id].display_name if user_id in players else "Player"
+
+
+def _reveal_text(session: GameSession, players: dict[int, discord.abc.User]) -> str:
+    """Debajo de la respuesta: cómo va la partida y cuándo sigue (quién acertó ya sale en la
+    tarjeta)."""
+    name = _names(players)
     top = session.ranking()[:3]
+    lines = []
     if top:
-        embed.add_field(
-            name="Top 3",
-            value="\n".join(
-                f"{_rank_label(i)} <@{p.user_id}> **{p.points}**" for i, p in enumerate(top)
-            ),
+        label = "Top 3" if len(top) == 3 else "Leaders"
+        lines.append(
+            f"**{label}** · " + " · ".join(f"{name(p.user_id)} **{p.points}**" for p in top)
         )
     left = session.total_rounds - session.round
-    embed.set_footer(
-        text=f"Next round in {BETWEEN_ROUNDS} s · {left} to go"
-        if left and not session.stopped
-        else "Last round"
-    )
-    return embed
+    if left and not session.stopped:
+        # Timestamp relativo: Discord lo muestra como "in 4 seconds" y lo va actualizando
+        nxt = timestamp(datetime.now(UTC) + timedelta(seconds=BETWEEN_ROUNDS), "R")
+        lines.append(f"Round {session.round} of {session.total_rounds} · next one {nxt}")
+    else:
+        lines.append("-# That was the last round")
+    return "\n".join(lines)
+
+
+def _rounds_played(session: GameSession) -> str:
+    """ "10 rounds", o "3 of 10 rounds" si la partida se paró antes."""
+    if session.round < session.total_rounds:
+        return f"{session.round} of {session.total_rounds} rounds"
+    return f"{session.total_rounds} rounds"
+
+
+def _summary_text(
+    session: GameSession, players: dict[int, discord.abc.User], client: discord.Client
+) -> str:
+    """Junto al podio: quién ganó (y si la partida se paró antes de tiempo)."""
+    winner = session.ranking()[0]
+    name = _names(players)(winner.user_id)
+    text = f"**{name}** wins with **{winner.points}** points!"
+    if session.round < session.total_rounds:
+        # Partida cortada: nadie "gana", solo iba primero
+        text = f"Game stopped after {_rounds_played(session)}. {name} led with {winner.points}."
+    return text
+
+
+def _your_rank(
+    rows: list[Any], players: list[trivia_cards.PlayerEntry], user_id: int
+) -> str | None:
+    """Junto al ranking: dónde está quien lo pidió ("You're #3, 260 points behind Pibe")."""
+    for i, row in enumerate(rows):
+        if row.user_id != user_id:
+            continue
+        if i == 0:
+            return f"You're **#1** with **{row.points:,}** points."
+        gap = rows[i - 1].points - row.points
+        return f"You're **#{i + 1}**, {gap:,} points behind {players[i - 1].name}."
+    return None
 
 
 def _summary_embed(session: GameSession) -> discord.Embed:
-    """El final: la clasificación de la partida (el podio va en la imagen)."""
+    """El final en texto, si no se pudo dibujar el podio (o nadie sumó puntos)."""
     embed = discord.Embed(title="Game over", color=COLOR)
     ranking = session.ranking()
     if ranking:

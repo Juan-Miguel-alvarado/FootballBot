@@ -38,7 +38,8 @@ LEAGUES: tuple[League, ...] = (
     League("PPL", "Primeira Liga", "Portugal", "🇵🇹", ("liga portugal",)),
     League("ELC", "Championship", "England", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", ("efl",)),
     League("BSA", "Brasileirão Série A", "Brazil", "🇧🇷", ("brasileirao", "brazil")),
-    League("CL", "Champions League", "Europe", "🇪🇺", ("ucl", "champions")),
+    # Las competiciones internacionales: la copa para la Champions, el continente para el resto
+    League("CL", "Champions League", "Europe", "🏆", ("ucl", "champions")),
     League("CLI", "Copa Libertadores", "South America", "🌎", ("libertadores",)),
     League("WC", "FIFA World Cup", "World", "🌍", ("mundial", "world cup")),
     League("EC", "European Championship", "Europe", "🇪🇺", ("euro", "eurocopa")),
@@ -74,13 +75,14 @@ class Zone:
 UCL, UEL, UECL = "🔵", "🟠", "🟢"
 PLAYOFF, DOWN, NONE = "🟡", "🔴", "⚪"
 # Los mismos colores en RGB para las tarjetas de imagen (imaging/cards.py)
-# Paleta del logo del bot: tonos de azul para Europa, ámbar y rojo apagados para el resto
+# Paleta del logo del bot: el azul para lo mejor (Champions), y colores bien distintos entre
+# sí para el resto, porque en el celular la franja es fina y tonos parecidos se confunden
 ZONE_RGB: dict[str, tuple[int, int, int]] = {
-    UCL: (11, 150, 254),
-    UEL: (130, 196, 255),
-    UECL: (60, 80, 230),
-    PLAYOFF: (212, 167, 44),
-    DOWN: (214, 69, 69),
+    UCL: (11, 150, 254),  # azul del logo
+    UEL: (245, 166, 35),  # naranja (como el 🟠 de la tabla en texto)
+    UECL: (59, 214, 198),  # turquesa
+    PLAYOFF: (154, 164, 178),  # gris claro
+    DOWN: (229, 72, 77),  # rojo
 }
 
 # Zonas por liga. Son las habituales de cada competición: pueden cambiar un poco cada
@@ -129,7 +131,6 @@ def zone_for(code: str, position: int, table_size: int) -> Zone | None:
 
 # Índices para buscar rápido: código -> liga, y código -> posición en LEAGUES.
 _BY_CODE = {league.code: league for league in LEAGUES}
-_ORDER = {league.code: i for i, league in enumerate(LEAGUES)}
 
 
 def get_league(code: str) -> League | None:
@@ -137,9 +138,13 @@ def get_league(code: str) -> League | None:
     return _BY_CODE.get(code.upper())
 
 
+# Orden de /matches y /live: primero lo que más gente mira (torneos, Champions, top 5)
+IMPORTANCE = ("WC", "EC", "CL", "PL", "PD", "SA", "BL1", "FL1", "CLI", "BSA", "PPL", "DED", "ELC")
+
+
 def league_order(code: str) -> int:
-    """Sort key that follows LEAGUES; unknown codes go last."""
-    return _ORDER.get(code, len(_ORDER))
+    """Clave para ordenar las ligas por importancia (IMPORTANCE); las desconocidas al final."""
+    return IMPORTANCE.index(code) if code in IMPORTANCE else len(IMPORTANCE)
 
 
 def _keys(league: League) -> list[str]:

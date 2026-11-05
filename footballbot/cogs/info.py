@@ -16,7 +16,8 @@ y añádelo a COMMANDS.md.
 import asyncio
 import io
 import logging
-from datetime import date
+from datetime import date, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import discord
@@ -28,7 +29,7 @@ from footballbot.cogs.common import (
     COLOR,
     MAX_EMBED_CHARS,
     MAX_EMBEDS_PER_MESSAGE,
-    branded,
+    command_mention,
     date_autocomplete,
     image_url,
     league_autocomplete,
@@ -37,11 +38,12 @@ from footballbot.cogs.common import (
     parse_league,
     split_lines,
     team_autocomplete,
+    timestamp,
 )
 from footballbot.errors import UserFacingError
 from footballbot.imaging import cards
 from footballbot.models import Match, MatchStatus, Standing
-from footballbot.providers.base import NotFoundError
+from footballbot.providers.base import NotFoundError, ProviderError
 from footballbot.services.football import MatchGroup, TeamProfile
 from footballbot.services.leagues import (
     LEAGUES,
@@ -67,6 +69,8 @@ _STATUS_LABELS = {
     MatchStatus.SUSPENDED: "SUS",
     MatchStatus.CANCELLED: "CAN",
 }
+# Barra gris de los embeds "no hay nada ahora" (/live vacío)
+IDLE_COLOR = discord.Color.from_rgb(90, 99, 116)
 # Raya de los marcadores ("2\u20131"): la tipográficamente correcta, más fina que un guion
 DASH = "\u2013"
 # Racha de /team en texto (solo si falla la tarjeta): ganó, empató, perdió.
@@ -112,25 +116,50 @@ class Info(commands.Cog):
         day = parse_day(when, self.football.today())
         chosen = parse_league(league)
         await interaction.response.defer()
-        groups = await self.football.matches_on(day, chosen.code if chosen else None)
+        await self._send_matches(interaction, day, chosen)
+
+    async def _send_matches(
+        self, interaction: discord.Interaction, day: date, chosen: League | None
+    ) -> None:
+        """Manda los partidos de `day` (y de `chosen`, si se eligió una liga) como followup.
+
+        Lo usan /matches y los botones de día (DayView): el mensaje lleva botones para ir al
+        día anterior y al siguiente, o al próximo día con partidos si este no tiene.
+        """
+        code = chosen.code if chosen else None
+        groups = await self.football.matches_on(day, code)
 
         # Un solo mensaje con una sección por liga (se reparte si no cabe)
+        # El título ya dice el día: el aviso de "no hay partidos" no lo repite
         title = f"{day:%A %d %B}"
-        empty = f"No matches on {day:%A %d %B}."
+        empty = "No matches this day."
         if chosen:
             title = f"{chosen.emoji} {chosen.name} · {day:%a %d %b}"
-            empty = f"No {chosen.name} matches on {day:%A %d %B}."
+            empty = f"No {chosen.name} matches this day."
+        hint = f"Try another day, or {command_mention(self.bot, 'leagues')} for the list."
+        next_day = None
+        if not groups:
+            # Sin partidos ese día: se dice cuándo es el próximo (y hay un botón para verlo)
+            try:
+                nxt = await self.football.next_matchday(day, code)
+            except ProviderError:
+                nxt = None
+            if nxt:
+                next_day, count = nxt
+                matches = "match" if count == 1 else "matches"
+                hint = f"Next: **{next_day:%A %d %B}** ({count} {matches})."
         batches = _league_embeds(
             groups,
             self.football.tz,
             title=title,
-            empty=f"{empty}\n-# Try another day with `date:tomorrow`, or `/leagues` for the list.",
-            footer=f"Kick-off times in {self.football.tz.key}",
+            empty=f"**{empty}**\n{hint}",
+            footer="Kick-off times are shown in your timezone",
             single=chosen is not None,
         )
-        branded(batches[0][0], self.bot, "Matches")
-        for batch in batches:
-            await interaction.followup.send(embeds=batch)
+        view = DayView(self, day, chosen, jump_to=next_day)
+        for i, batch in enumerate(batches):
+            last = i == len(batches) - 1
+            await interaction.followup.send(embeds=batch, **({"view": view} if last else {}))
 
     # /live [league]
     @app_commands.command(description="Matches being played right now")
@@ -140,18 +169,48 @@ class Info(commands.Cog):
         chosen = parse_league(league)
         await interaction.response.defer()
         groups = await self.football.live(chosen.code if chosen else None)
+        empty = "**Nothing is being played right now.**"
+        if not groups:
+            empty += await self._next_kickoff(chosen.code if chosen else None)
+            empty += "\n-# Live scores can lag a few minutes behind."
 
         batches = _league_embeds(
             groups,
             self.football.tz,
             title="🔴 Live now",
-            empty="Nothing is being played right now.\n-# `/matches` shows today's fixtures.",
-            footer="Free data runs a few minutes behind",
+            empty=empty,
+            idle_color=True,
+            footer="Scores can lag a few minutes behind",
             single=chosen is not None,
         )
-        branded(batches[0][0], self.bot, "Live")
-        for batch in batches:
-            await interaction.followup.send(embeds=batch)
+        view = None
+        if not groups:
+            view = DayView(self, self.football.today(), chosen, only_today=True)
+        for i, batch in enumerate(batches):
+            last = i == len(batches) - 1
+            await interaction.followup.send(
+                embeds=batch, **({"view": view} if last and view else {})
+            )
+
+    async def _next_kickoff(self, league: str | None) -> str:
+        """Para /live sin partidos: "Next kick-off: Arsenal vs Chelsea at 15:00 (in 2 hours)"."""
+        try:
+            groups = await self.football.matches_on(self.football.today(), league)
+        except ProviderError:
+            groups = []
+        upcoming = sorted(
+            (m for g in groups for m in g.matches if m.is_upcoming), key=lambda m: m.kickoff
+        )
+        if not upcoming:
+            return (
+                f"\n-# No more matches today. {command_mention(self.bot, 'matches')} "
+                "with `date:tomorrow` shows the next ones."
+            )
+        nxt = upcoming[0]
+        return (
+            f"\nNext kick-off: **{nxt.home.short_name} vs {nxt.away.short_name}** "
+            f"at {timestamp(nxt.kickoff)} ({timestamp(nxt.kickoff, 'R')})"
+        )
 
     # /standings <league>
     @app_commands.command(description="League table")
@@ -174,16 +233,19 @@ class Info(commands.Cog):
             )
 
         competition = tables[0].competition
-        embed = discord.Embed(color=COLOR)
         # Primero la tarjeta en imagen (issue #10); si algo falla, la tabla en texto de siempre.
-        # Con imagen el embed no repite el título: la tarjeta ya dice liga y jornada.
-        png = await self._standings_image(chosen, tables)
-        if png:
-            embed.description = _leader_line(tables[0]) if len(tables) == 1 else None
-            embed.set_image(url="attachment://standings.png")
-            file = discord.File(io.BytesIO(png), filename="standings.png")
-            await interaction.followup.send(embed=branded(embed, self.bot, "Standings"), file=file)
+        # La imagen va suelta (sin embed): así Discord la muestra más grande. El texto solo
+        # dice quién va primero; la tarjeta ya dice liga y jornada.
+        pngs = await self._standings_image(chosen, tables)
+        if pngs:
+            content = _leader_line(tables[0]) if len(tables) == 1 else None
+            # Tablas largas (Champions): una tarjeta por mensaje, para que no salgan chiquitas
+            for i, png in enumerate(pngs):
+                file = discord.File(io.BytesIO(png), filename=f"standings-{i + 1}.png")
+                await interaction.followup.send(content if i == 0 else None, file=file)
             return
+
+        embed = discord.Embed(color=COLOR)
 
         embed.title = f"{chosen.emoji} {chosen.name} · Standings"
 
@@ -203,7 +265,6 @@ class Info(commands.Cog):
             embeds = pack_fields(embed, fields)
         if tables[0].matchday:
             embeds[-1].set_footer(text=f"Matchday {tables[0].matchday}")
-        branded(embeds[0], self.bot, "Standings")
         await interaction.followup.send(embeds=embeds)
 
     # /team <team>
@@ -219,15 +280,24 @@ class Info(commands.Cog):
         if png is None:
             await interaction.followup.send(embed=_team_embed(profile, self.football.tz))
             return
-        # La tarjeta ya dice el nombre: el embed solo añade el enlace a la web del club
-        embed = discord.Embed(color=COLOR)
+        # Arriba, el próximo partido con la hora en la zona de cada uno (la tarjeta no puede);
+        # debajo, un botón que abre la web del club
+        content = None
+        if nxt := profile.next_match:
+            home = nxt.home.id == profile.team.id
+            rival = (nxt.away if home else nxt.home).short_name
+            content = (
+                f"Next: **{'vs' if home else 'at'} {rival}** · "
+                f"{timestamp(nxt.kickoff, 'f')} ({timestamp(nxt.kickoff, 'R')})"
+            )
+        file = discord.File(io.BytesIO(png), filename="team.png")
         website = profile.team.website
         if website and website.startswith("http"):
-            domain = website.split("//", 1)[1].removeprefix("www.").rstrip("/")
-            embed.description = f"[{domain}]({website})"
-        embed.set_image(url="attachment://team.png")
-        file = discord.File(io.BytesIO(png), filename="team.png")
-        await interaction.followup.send(embed=branded(embed, self.bot, "Team"), file=file)
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label="Official website", url=website))
+            await interaction.followup.send(content, file=file, view=view)
+        else:
+            await interaction.followup.send(content, file=file)
 
     # --- tarjetas en imagen ----------------------------------------------------------------
 
@@ -245,8 +315,8 @@ class Info(commands.Cog):
 
         return list(await asyncio.gather(*(one(url) for url in urls)))
 
-    async def _standings_image(self, league: League, tables: list[Standing]) -> bytes | None:
-        """La tabla como tarjeta PNG, o None si no se pudo generar."""
+    async def _standings_image(self, league: League, tables: list[Standing]) -> list[bytes]:
+        """La tabla como tarjetas PNG (una, o varias si es muy larga). [] si no se pudo."""
         try:
             urls = [tables[0].competition.emblem] + [r.team.crest for t in tables for r in t.rows]
             emblem, *crests = await self._images(urls)
@@ -276,17 +346,31 @@ class Info(commands.Cog):
             subtitle = "Standings"
             if tables[0].matchday:
                 subtitle += f" · Matchday {tables[0].matchday}"
-            return await asyncio.to_thread(
-                cards.standings_card,
-                title=league.name,
-                subtitle=subtitle,
-                emblem=emblem,
-                groups=groups,
-                legend=legend,
-            )
+            pages = _pages(groups)
+            pngs = []
+            for number, page in enumerate(pages, start=1):
+                page_subtitle = subtitle
+                page_legend = legend
+                if len(pages) > 1:
+                    first, last = page[0].rows[0].position, page[-1].rows[-1].position
+                    page_subtitle += f" · Places {first}{DASH}{last} ({number}/{len(pages)})"
+                    # En cada mitad, solo las zonas que aparecen en ella
+                    colors = {r.zone_color for g in page for r in g.rows}
+                    page_legend = [item for item in legend if item[0] in colors]
+                pngs.append(
+                    await asyncio.to_thread(
+                        cards.standings_card,
+                        title=league.name,
+                        subtitle=page_subtitle,
+                        emblem=emblem,
+                        groups=page,
+                        legend=page_legend,
+                    )
+                )
+            return pngs
         except Exception:
             log.exception("Could not draw the standings card for %s", league.code)
-            return None
+            return []
 
     async def _team_image(self, profile: TeamProfile) -> bytes | None:
         """El perfil del equipo como tarjeta PNG, o None si no se pudo generar."""
@@ -305,8 +389,7 @@ class Info(commands.Cog):
                 for label, value in (
                     ("Stadium", team.venue),
                     ("Coach", team.coach),
-                    ("Colors", team.colors),
-                    ("Competitions", ", ".join(
+                    ("Plays in", ", ".join(
                         _competition_name(c.code, c.name) for c in team.competitions)),
                 )
                 if value
@@ -328,7 +411,8 @@ class Info(commands.Cog):
                     away_crest=away_crest,
                     opponent=(nxt.away if home else nxt.home).short_name,
                     home=home,
-                    when=f"{nxt.kickoff.astimezone(tz):%a %d %b · %H:%M}",
+                    # Solo el día: la hora exacta va en el mensaje, en la zona de cada uno
+                    when=f"{nxt.kickoff.astimezone(tz):%a %d %b}",
                     competition=_competition_name(nxt.competition.code, nxt.competition.name),
                 )
             return await asyncio.to_thread(
@@ -346,7 +430,7 @@ class Info(commands.Cog):
             return None
 
     # /leagues
-    @app_commands.command(description="Leagues and competitions the bot knows, with their codes")
+    @app_commands.command(description="Leagues and their codes")
     async def leagues(self, interaction: discord.Interaction) -> None:
         # No llama a la API (la lista es fija, services/leagues.py), así que responde directo
         # con send_message, sin defer.
@@ -357,10 +441,59 @@ class Info(commands.Cog):
             color=COLOR,
         )
         for region, leagues in _leagues_by_region():
-            lines = [f"{lg.emoji} `{lg.code:<3}` {lg.name}" for lg in leagues]
+            lines = [f"{lg.emoji} `{lg.code}` {lg.name}" for lg in leagues]
             embed.add_field(name=region, value="\n".join(lines), inline=False)
-        embed.set_footer(text="Data from football-data.org (free plan)")
-        await interaction.response.send_message(embed=branded(embed, self.bot, "Leagues"))
+        embed.set_footer(text="Data: football-data.org")
+        await interaction.response.send_message(embed=embed)
+
+
+class DayView(discord.ui.View):
+    """Botones debajo de /matches: día anterior y siguiente (o el próximo día con partidos).
+
+    Cada botón manda un mensaje nuevo con los partidos de ese día, como si se escribiera
+    /matches con esa fecha. `only_today`: un solo botón "Today's matches" (para /live vacío).
+    """
+
+    def __init__(
+        self,
+        cog: Info,
+        day: date,
+        league: League | None,
+        *,
+        jump_to: date | None = None,
+        only_today: bool = False,
+    ) -> None:
+        super().__init__(timeout=900)  # 15 minutos; después los botones dejan de responder
+        self.cog = cog
+        self.league = league
+        if only_today:
+            self._add("Today's matches", day, discord.ButtonStyle.primary)
+            return
+        self._add(f"Previous day · {day - timedelta(days=1):%a %d}", day - timedelta(days=1))
+        if jump_to:
+            self._add(f"Show {jump_to:%a %d %b}", jump_to, discord.ButtonStyle.primary)
+        self._add(f"Next day · {day + timedelta(days=1):%a %d}", day + timedelta(days=1))
+
+    def _add(
+        self, label: str, day: date, style: discord.ButtonStyle = discord.ButtonStyle.secondary
+    ) -> None:
+        button: discord.ui.Button[DayView] = discord.ui.Button(label=label, style=style)
+
+        async def callback(interaction: discord.Interaction) -> None:
+            await interaction.response.defer()
+            await self.cog._send_matches(interaction, day, self.league)
+
+        button.callback = callback
+        self.add_item(button)
+
+    async def on_error(
+        self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]
+    ) -> None:
+        # Los botones no pasan por bot.py: se responde aquí, con el mismo estilo de error
+        await self.cog.bot._reply_error(
+            interaction, "Couldn't load those matches. Try again in a moment."
+        )
+        log.warning("Day button failed: %s", error)
 
 
 # --- formatting --------------------------------------------------------------------------------
@@ -371,27 +504,27 @@ class Info(commands.Cog):
 def _match_line(match: Match, tz: ZoneInfo) -> str:
     """Una línea por partido.
 
-    "`15:00` Arsenal vs Chelsea" (por jugar), "`   FT` Arsenal **2-1** Chelsea" (terminado),
-    "`🔴LIVE` Arsenal **1-0** Chelsea" (en vivo).
+    "<t:...:t> · Arsenal vs Chelsea" (por jugar; Discord muestra la hora local),
+    "FT · **Arsenal** 2\u20131 Chelsea" (terminado, el ganador en negrita),
+    "🔴 **LIVE** · Arsenal **1\u20130** Chelsea" (en vivo).
     """
     home, away = match.home.short_name, match.away.short_name
     has_score = match.home_score is not None and match.away_score is not None
     if match.is_upcoming or not has_score:
-        # Por jugar: la hora local (o PST/CAN si se aplazó o canceló).
-        label = _STATUS_LABELS.get(match.status) or f"{match.kickoff.astimezone(tz):%H:%M}"
-        return f"`{label:>5}` {home} vs {away}"
+        # Por jugar: la hora como timestamp de Discord, que cada uno ve en su zona horaria
+        # (o PST/CAN si se aplazó o canceló)
+        when = _STATUS_LABELS.get(match.status) or f"**{timestamp(match.kickoff)}**"
+        return f"{when} · {home} vs {away}"
     label = _STATUS_LABELS.get(match.status, match.status[:4])
+    hs, as_ = match.home_score, match.away_score
     if match.is_live:
-        label = f"🔴{label}"
-    elif match.is_finished:
-        # Terminado: el ganador en negrita
-        hs, as_ = match.home_score, match.away_score
+        return f"🔴 **{label}** · {home} **{hs}{DASH}{as_}** {away}"
+    if match.is_finished:
         if hs > as_:
             home = f"**{home}**"
         elif as_ > hs:
             away = f"**{away}**"
-        return f"`{label:>5}` {home} {hs}{DASH}{as_} {away}"
-    return f"`{label:>5}` {home} **{match.home_score}{DASH}{match.away_score}** {away}"
+    return f"{label} · {home} {hs}{DASH}{as_} {away}"
 
 
 def _league_embeds(
@@ -402,6 +535,7 @@ def _league_embeds(
     empty: str,
     footer: str,
     single: bool = False,
+    idle_color: bool = False,
 ) -> list[list[discord.Embed]]:
     """/matches y /live: un mensaje compacto con una sección (campo) por liga.
 
@@ -422,6 +556,8 @@ def _league_embeds(
             header.set_thumbnail(url=emblem)
     else:
         header.description = empty
+        if idle_color:
+            header.color = IDLE_COLOR  # /live sin partidos: barra gris, no la del logo
 
     fields = []
     for group in groups:
@@ -433,7 +569,8 @@ def _league_embeds(
             label = "Fixtures" if single else name
             fields.append((label if i == 0 else f"{label} (cont.)", chunk))
     embeds = pack_fields(header, fields)
-    embeds[-1].set_footer(text=footer)
+    if groups:  # sin partidos, el pie (zona horaria, retraso) no aporta nada
+        embeds[-1].set_footer(text=footer)
 
     # Discord deja 6000 caracteres por mensaje sumando todos sus embeds
     batches: list[list[discord.Embed]] = [[]]
@@ -448,6 +585,19 @@ def _league_embeds(
         batches[-1].append(embed)
         used += size
     return batches
+
+
+def _pages(groups: list[cards.TableGroup], size: int = 18) -> list[list[cards.TableGroup]]:
+    """Reparte una tabla muy larga (Champions: 36) en tarjetas de `size` filas.
+
+    Las tablas normales (hasta cards.MAX_ROWS filas) y los torneos con grupos van en una sola.
+    """
+    if len(groups) != 1 or len(groups[0].rows) <= cards.MAX_ROWS:
+        return [groups]
+    rows = groups[0].rows
+    return [
+        [cards.TableGroup(groups[0].title, rows[i : i + size])] for i in range(0, len(rows), size)
+    ]
 
 
 def _leagues_by_region() -> list[tuple[str, list[League]]]:

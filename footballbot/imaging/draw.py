@@ -18,7 +18,7 @@ import math
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 FONTS_DIR = Path(__file__).resolve().parent / "fonts"
 FONT_FILES = {"text": "Inter.ttf", "title": "Oswald.ttf"}
@@ -33,7 +33,7 @@ LINE: RGB = (28, 36, 50)  # líneas finas y bordes apagados
 BLUE: RGB = (11, 150, 254)  # el azul claro del balón (#0B96FE)
 BLUE_DEEP: RGB = (3, 98, 255)  # el azul profundo del balón (#0362FF)
 TEXT: RGB = (242, 245, 250)
-MUTED: RGB = (125, 136, 153)
+MUTED: RGB = (146, 157, 174)  # texto secundario: claro como para leerse en el celular
 WIN: RGB = BLUE
 DRAW: RGB = (90, 99, 116)
 LOSS: RGB = (214, 69, 69)  # rojo apagado: solo para perder y descender
@@ -105,10 +105,27 @@ def paste_icon(
     canvas.paste(icon, (x, y), icon)
 
 
-def to_png(image: Image.Image) -> bytes:
+def to_png(image: Image.Image, keep_alpha: bool = False) -> bytes:
+    """La imagen como PNG. Las tarjetas van sin transparencia; `keep_alpha` la conserva."""
     output = io.BytesIO()
-    image.convert("RGB").save(output, format="PNG", optimize=True)
+    image.convert("RGBA" if keep_alpha else "RGB").save(output, format="PNG", optimize=True)
     return output.getvalue()
+
+
+# Colores para los avatares sin foto: tonos del logo, distintos para cada jugador
+AVATAR_FILLS: tuple[RGB, ...] = (
+    (3, 98, 255),
+    (11, 150, 254),
+    (0, 172, 230),
+    (40, 120, 235),
+    (0, 120, 210),
+    (70, 110, 255),
+)
+
+
+def avatar_fill(name: str) -> RGB:
+    """Siempre el mismo color para el mismo nombre (así cada jugador se reconoce)."""
+    return AVATAR_FILLS[sum(name.encode()) % len(AVATAR_FILLS)]
 
 
 def avatar(
@@ -170,8 +187,16 @@ def logo(size: int, opacity: float = 1.0) -> Image.Image:
 def shards(width: int, opacity: float = 1.0) -> Image.Image:
     """Solo los fragmentos que salen volando del balón, recortados del logo."""
     image = _logo_rgba()
-    # Los fragmentos están en la parte derecha del logo
+    # Los fragmentos están en la parte derecha del logo. El corte toca el borde del balón y
+    # algún fragmento: se borra todo lo que toca el borde izquierdo, así no queda nada cortado
     crop = image.crop((round(image.width * 0.6), 0, image.width, image.height))
+    alpha = crop.getchannel("A")
+    solid = alpha.point(lambda a: 255 if a > 40 else 0)
+    for y in range(solid.height):
+        if solid.getpixel((0, y)) == 255:
+            ImageDraw.floodfill(solid, (0, y), 0)
+    keep = solid.filter(ImageFilter.MaxFilter(5))
+    crop.putalpha(ImageChops.multiply(alpha, keep))
     crop = crop.crop(crop.getbbox())
     height = round(crop.height * width / crop.width)
     crop = crop.resize((width, height), Image.Resampling.LANCZOS)
@@ -217,6 +242,23 @@ def brand(canvas: Image.Image, right: int, top: int, size: int = 64) -> None:
     paste(canvas, mark, (right - mark.width, top))
 
 
+def outline_icon(icon: Image.Image, stroke: int) -> Image.Image:
+    """Añade un borde claro y suave que sigue la forma de la imagen (efecto sticker).
+
+    El borde sale de desenfocar la transparencia y volver a endurecerla: así queda redondeado
+    y sin escalones, en vez del borde dentado que daba engordar píxel a píxel.
+    `icon` debe tener margen transparente de al menos `stroke` px alrededor.
+    """
+    alpha = icon.getchannel("A")
+    spread = alpha.filter(ImageFilter.GaussianBlur(stroke * 0.7))
+    # Rampa corta: el borde queda nítido (1-2 px de suavizado), no como un halo difuso
+    outline = spread.point(lambda a: max(0, min(255, (a - 10) * 18)))
+    canvas = Image.new("RGBA", icon.size, (0, 0, 0, 0))
+    canvas.paste((236, 239, 244, 255), (0, 0), outline)
+    canvas.alpha_composite(icon)
+    return canvas
+
+
 def sticker(data: bytes | None, size: int, stroke: int = 0) -> Image.Image | None:
     """El escudo como "sticker": recortado a su forma, con un borde claro alrededor.
 
@@ -228,14 +270,9 @@ def sticker(data: bytes | None, size: int, stroke: int = 0) -> Image.Image | Non
     icon = load_icon(data, size - 2 * stroke)
     if icon is None:
         return None
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    alpha = Image.new("L", (size, size), 0)
-    alpha.paste(icon.getchannel("A").point(lambda a: 255 if a > 60 else 0), (stroke, stroke))
-    # Engordar la silueta `stroke` píxeles = el borde
-    outline = alpha.filter(ImageFilter.MaxFilter(2 * stroke + 1))
-    canvas.paste((236, 239, 244, 255), (0, 0), outline)
-    canvas.alpha_composite(icon, (stroke, stroke))
-    return canvas
+    padded = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    padded.paste(icon, (stroke, stroke), icon)
+    return outline_icon(padded, stroke)
 
 
 def tile(

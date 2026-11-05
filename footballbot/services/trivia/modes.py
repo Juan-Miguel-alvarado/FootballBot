@@ -45,7 +45,7 @@ MODES: dict[str, Mode] = {
     "crest": Mode(
         key="crest",
         title="Pixelated crest",
-        prompt="Which club is this?",
+        prompt="Which club is behind the pixels?",
         effect="pixelate",
         levels=(6, 10, 16, 28),
         pool="teams",
@@ -53,7 +53,7 @@ MODES: dict[str, Mode] = {
     "blur": Mode(
         key="blur",
         title="Blurred crest",
-        prompt="Which club is this?",
+        prompt="Which club is under the blur?",
         effect="blur",
         levels=(32, 20, 12, 6),
         pool="teams",
@@ -69,7 +69,7 @@ MODES: dict[str, Mode] = {
     "silhouette": Mode(
         key="silhouette",
         title="Silhouette",
-        prompt="Which club is this?",
+        prompt="Whose crest has this shape?",
         effect="silhouette",
         # Cuánto color asoma en cada etapa: al principio solo la forma
         levels=(0, 0.04, 0.12, 0.3),
@@ -78,7 +78,7 @@ MODES: dict[str, Mode] = {
     "zoom": Mode(
         key="zoom",
         title="Zoomed crest",
-        prompt="Which club is this?",
+        prompt="Which club's crest is this?",
         effect="zoom",
         # Qué parte del escudo se ve: empieza por un trocito y se va abriendo
         levels=(0.18, 0.3, 0.5, 0.8),
