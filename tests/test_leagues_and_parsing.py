@@ -53,6 +53,8 @@ def test_parse_league() -> None:
         ("tomorrow", date(2026, 10, 25)),
         ("Yesterday", date(2026, 10, 23)),
         ("2026-12-31", date(2026, 12, 31)),
+        ("mañana", date(2026, 10, 25)),  # también en español
+        ("hoy", date(2026, 10, 24)),
     ],
 )
 def test_parse_day(value: str | None, expected: date) -> None:
@@ -183,7 +185,7 @@ def test_finished_match_shows_the_winner_in_bold() -> None:
     from footballbot.cogs.info import _match_line
 
     line = _match_line(_group("PL", 1).matches[0], ZoneInfo("UTC"))
-    assert line == "`   FT` **Arsenal** 2\u20131 Chelsea"
+    assert line == "FT · **Arsenal** 2\u20131 Chelsea"
 
 
 def test_leagues_by_region() -> None:
@@ -200,5 +202,25 @@ def test_ping_colors() -> None:
     from footballbot.cogs.common import COLOR
 
     fast, normal, slow = (_latency_color(ms) for ms in (50, 200, 900))
-    assert fast == COLOR  # rápido: el azul del logo
+    assert fast != COLOR  # rápido: verde, como el punto de estado
     assert len({fast.value, normal.value, slow.value}) == 3
+
+
+def test_similar_team_names_for_typos() -> None:
+    from footballbot.models import Team
+    from footballbot.services.football import FootballService
+
+    service = FootballService.__new__(FootballService)  # solo el índice de equipos
+    service._teams = {
+        1: Team(1, "FC Barcelona", "Barça"),
+        2: Team(2, "Real Madrid CF", "Real Madrid"),
+    }
+    assert service.similar_teams("barcelna") == ["Barça"]
+    assert service.similar_teams("nonexistent fc") == []
+
+
+def test_leagues_sorted_by_importance() -> None:
+    from footballbot.services.leagues import league_order
+
+    codes = sorted(["ELC", "PL", "CL", "BSA", "WC", "XYZ"], key=league_order)
+    assert codes == ["WC", "CL", "PL", "BSA", "ELC", "XYZ"]

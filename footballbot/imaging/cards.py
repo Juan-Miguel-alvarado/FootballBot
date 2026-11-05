@@ -20,7 +20,6 @@ from footballbot.imaging.draw import (
     LINE,
     LOSS,
     MUTED,
-    PANEL,
     RGB,
     TEXT,
     WIN,
@@ -69,12 +68,22 @@ class TableGroup:
 
 
 HEADER_H = 150
-COLUMNS_H = 44
+COLUMNS_H = 48
 GROUP_TITLE_H = 52
-LEGEND_LINE_H = 40
+LEGEND_LINE_H = 44
 FOOTER_H = 50
-# Centro de cada columna de números
-STAT_X = {"P": 590, "W": 642, "D": 694, "L": 746, "GD": 806, "PTS": 864}
+# Centro de cada columna de números. Ganados-empatados-perdidos van juntos ("12-3-4"):
+# tres columnas estrechas se leían mal en el celular
+STAT_X = {"P": 562, "W-D-L": 666, "GD": 772, "PTS": 844}
+# Signo menos tipográfico para la diferencia de goles (más ancho que el guion "-")
+MINUS = "\u2212"
+# Los números de la tabla (partidos, W-D-L, GD): más claros que MUTED, se leen mejor
+STAT_COLOR: RGB = (184, 192, 206)
+# Filas alternas: un poco más claras que el fondo, para seguir la fila con la vista
+ROW_FILL: RGB = (17, 21, 30)
+# Más de esto en una sola tarjeta y las filas quedan muy bajas para el celular:
+# cogs/info.py reparte las tablas largas (Champions, 36 equipos) en varias tarjetas
+MAX_ROWS = 20
 
 
 def standings_card(
@@ -88,7 +97,7 @@ def standings_card(
     """La tabla como imagen: cabecera con el logo, filas con escudo y franja de zona, leyenda."""
     total_rows = sum(len(g.rows) for g in groups)
     # Filas altas y letra grande: Discord encoge la imagen a ~400 px de ancho en el celular
-    row_h = 52 if total_rows <= 24 else 42
+    row_h = 58 if total_rows <= MAX_ROWS else 46
     group_titles = sum(1 for g in groups if g.title)
     legend_lines = _legend_lines(legend)
     height = (
@@ -107,27 +116,30 @@ def standings_card(
 
     # Títulos de las columnas
     y = HEADER_H
-    label_font = font("text", 18, "SemiBold")
+    label_font = font("text", 20, "SemiBold")
     middle = y + COLUMNS_H // 2
     draw.text((62, middle), "#", font=label_font, fill=MUTED, anchor="mm")
-    draw.text((140, middle), "TEAM", font=label_font, fill=MUTED, anchor="lm")
+    draw.text((150, middle), "TEAM", font=label_font, fill=MUTED, anchor="lm")
     for label, x in STAT_X.items():
         draw.text((x, middle), label, font=label_font, fill=MUTED, anchor="mm")
     y += COLUMNS_H
 
-    big = row_h > 42
-    name_font = font("text", 27 if big else 23, "SemiBold")
-    stat_font = font("text", 25 if big else 21, "Regular")
-    pts_font = font("text", 28 if big else 23, "Bold")
+    big = row_h > 46
+    name_font = font("text", 30 if big else 25, "SemiBold")
+    stat_font = font("text", 27 if big else 23, "Medium")
+    pts_font = font("text", 31 if big else 26, "Bold")
     for group in groups:
         if group.title:
             draw.rectangle((24, y + 18, 30, y + GROUP_TITLE_H - 10), fill=BLUE)
             draw.text((42, y + GROUP_TITLE_H // 2 + 4), group.title.upper(),
                       font=font("title", 26, "SemiBold"), fill=TEXT, anchor="lm")  # fmt: skip
             y += GROUP_TITLE_H
+        # Puestos repetidos (empate total): se marcan con "=" delante, como en la prensa
+        positions = [r.position for r in group.rows]
         for i, row in enumerate(group.rows):
+            tied = positions.count(row.position) > 1
             _table_row(canvas, draw, row, y, row_h, i % 2 == 0,
-                       name_font, stat_font, pts_font)  # fmt: skip
+                       name_font, stat_font, pts_font, tied)  # fmt: skip
             y += row_h
 
     if legend_lines:
@@ -135,10 +147,9 @@ def standings_card(
         for line in legend_lines:
             x = 30
             for color, label in line:
-                draw.rectangle((x, y + 13, x + 14, y + 27), fill=color)
-                draw.text((x + 24, y + 20), label, font=font("text", 20, "Medium"),
-                          fill=TEXT, anchor="lm")  # fmt: skip
-                x += 24 + int(font("text", 20, "Medium").getlength(label)) + 34
+                draw.rectangle((x, y + 12, x + 18, y + 30), fill=color)
+                draw.text((x + 26, y + 21), label, font=_legend_font(), fill=TEXT, anchor="lm")
+                x += 26 + int(_legend_font().getlength(label)) + 22
             y += LEGEND_LINE_H
 
     _footer(draw, height)
@@ -155,27 +166,48 @@ def _table_row(
     name_font: ImageFont.FreeTypeFont,
     stat_font: ImageFont.FreeTypeFont,
     pts_font: ImageFont.FreeTypeFont,
+    tied: bool = False,
 ) -> None:
     middle = y + row_h // 2
-    if even:
-        draw.rectangle((24, y, WIDTH - 24, y + row_h - 1), fill=PANEL)
+    base = ROW_FILL if even else BLACK
+    if row.zone_color:
+        # La fila de una zona lleva un toque de su color: se ve aunque la franja sea fina
+        base = _mix(base, row.zone_color, 0.10)
+    if even or row.zone_color:
+        draw.rectangle((24, y, WIDTH - 24, y + row_h - 1), fill=base)
     if row.zone_color:
         # Franja a la izquierda: dice la zona (Champions, descenso...)
-        draw.rectangle((24, y, 30, y + row_h - 1), fill=row.zone_color)
-    # El puesto en el color de su zona: se ve de un vistazo quién entra en Champions o baja
-    position_font = font("title", 26 if row_h > 42 else 22, "SemiBold")
-    draw.text((62, middle), str(row.position), font=position_font, fill=row.zone_color or MUTED,
-              anchor="mm")  # fmt: skip
+        draw.rectangle((24, y, 36, y + row_h - 1), fill=row.zone_color)
+    # El puesto en blanco (en el color de la zona costaba leerlo); la franja ya dice la zona
+    position_font = font("title", 29 if row_h > 46 else 25, "SemiBold")
+    label = f"={row.position}" if tied else str(row.position)
+    if tied:  # un carácter más: un poco más pequeño para que no se salga de la columna
+        position_font = font("title", position_font.size - 4, "SemiBold")
+    draw.text((66, middle), label, font=position_font, fill=TEXT, anchor="mm")
     # El escudo como sticker (borde claro con su forma): se ven también los oscuros
     side = row_h - 10
-    tile(canvas, row.crest, (88, middle - side // 2, 88 + side, middle + side // 2))
-    draw.text((142, middle), truncate(row.name, name_font, 400), font=name_font, fill=TEXT,
+    tile(canvas, row.crest, (96, middle - side // 2, 96 + side, middle + side // 2))
+    draw.text((152, middle), truncate(row.name, name_font, 340), font=name_font, fill=TEXT,
               anchor="lm")  # fmt: skip
-    gd = f"{row.goal_difference:+d}" if row.goal_difference else "0"
-    stats = {"P": row.played, "W": row.won, "D": row.draw, "L": row.lost, "GD": gd}
+    gd = f"{row.goal_difference:+d}".replace("-", MINUS) if row.goal_difference else "0"
+    stats = {"P": row.played, "W-D-L": f"{row.won}-{row.draw}-{row.lost}", "GD": gd}
     for label, value in stats.items():
-        draw.text((STAT_X[label], middle), str(value), font=stat_font, fill=MUTED, anchor="mm")
+        draw.text((STAT_X[label], middle), str(value), font=stat_font, fill=STAT_COLOR,
+                  anchor="mm")  # fmt: skip
     draw.text((STAT_X["PTS"], middle), str(row.points), font=pts_font, fill=TEXT, anchor="mm")
+
+
+def _mix(a: RGB, b: RGB, amount: float) -> RGB:
+    """Mezcla dos colores: `amount` 0 = solo a, 1 = solo b."""
+    return (
+        round(a[0] + (b[0] - a[0]) * amount),
+        round(a[1] + (b[1] - a[1]) * amount),
+        round(a[2] + (b[2] - a[2]) * amount),
+    )
+
+
+def _legend_font() -> ImageFont.FreeTypeFont:
+    return font("text", 21, "Medium")
 
 
 def _legend_lines(legend: Sequence[tuple[RGB, str]]) -> list[list[tuple[RGB, str]]]:
@@ -183,9 +215,8 @@ def _legend_lines(legend: Sequence[tuple[RGB, str]]) -> list[list[tuple[RGB, str
     lines: list[list[tuple[RGB, str]]] = []
     current: list[tuple[RGB, str]] = []
     used = 30
-    label_font = font("text", 20, "Medium")
     for color, label in legend:
-        size = 24 + int(label_font.getlength(label)) + 34
+        size = 26 + int(_legend_font().getlength(label)) + 22
         if current and used + size > WIDTH - 30:
             lines.append(current)
             current, used = [], 30
@@ -219,82 +250,105 @@ def team_card(
     last_result: str | None = None,
     next_match: NextMatch | None = None,
 ) -> bytes:
-    """Perfil del equipo: escudo grande, datos, racha W/D/L y el próximo partido tipo "versus"."""
-    height = 640
+    """Perfil del equipo: escudo grande, datos, racha W/D/L y el próximo partido tipo "versus".
+
+    Si no hay partidos (ligas que el plan gratis no cubre) la tarjeta es más baja y solo dice
+    eso en una línea, en vez de dejar dos columnas vacías.
+    """
+    empty = not form and not next_match
+    # Datos: etiqueta pequeña a la izquierda y valor a la derecha; si el valor es largo, sigue
+    # en otra línea. Se mide antes de dibujar: la altura de la tarjeta depende de esto
+    label_font = font("text", 21, "SemiBold")
+    value_font = font("text", 26, "SemiBold")
+    # La columna de valores empieza después de la etiqueta más larga ("COMPETITIONS")
+    value_x = 332 + max((int(label_font.getlength(lb.upper())) for lb, _ in facts[:4]), default=0)
+    value_x += 26
+    rows = [(lb, _wrap(v, value_font, WIDTH - 40 - value_x)[:3]) for lb, v in facts[:4]]
+    facts_bottom = 178 + sum(40 + (len(lines) - 1) * 32 for _, lines in rows)
+    top = max(330, facts_bottom + 16)  # la línea que separa los datos de los partidos
+    height = top + (140 if empty else 330)
+
     canvas = Image.new("RGBA", (WIDTH, height), (*BLACK, 255))
     # El logo del bot, grande y muy tenue, saliendo por la esquina de abajo a la derecha
-    paste(canvas, logo(560, opacity=0.09), (WIDTH - 420, height - 330))
+    paste(canvas, logo(560, opacity=0.05), (WIDTH - 420, height - 330))
     draw = ImageDraw.Draw(canvas)
 
-    tile(canvas, crest, (44, 44, 290, 290), border=BLUE)
+    tile(canvas, crest, (40, 40, 290, 290))
 
-    title_font = fit_font(name.upper(), "title", "Bold", 64, 470, 30)
-    draw.text((330, 82), name.upper(), font=title_font, fill=TEXT, anchor="lm")
-    draw.text((332, 136), subtitle, font=font("text", 24, "Medium"), fill=MUTED, anchor="lm")
+    brand(canvas, right=WIDTH - 28, top=26, size=96)
+    title_font = fit_font(name.upper(), "title", "Bold", 66, 440, 30)
+    draw.text((330, 80), name.upper(), font=title_font, fill=TEXT, anchor="lm")
+    draw.text((332, 134), subtitle, font=font("text", 25, "Medium"), fill=MUTED, anchor="lm")
 
-    y = 190
-    for label, value in facts[:4]:
-        draw.text((332, y), label.upper(), font=font("text", 17, "SemiBold"), fill=MUTED,
-                  anchor="lm")  # fmt: skip
-        value_font = font("text", 24, "SemiBold")
-        draw.text((500, y), truncate(value, value_font, 370), font=value_font, fill=TEXT,
-                  anchor="lm")  # fmt: skip
-        y += 38
+    y = 178
+    for label, lines in rows:
+        draw.text((332, y + 15), label.upper(), font=label_font, fill=MUTED, anchor="lm")
+        for i, line in enumerate(lines):
+            draw.text((value_x, y + 15 + i * 32), line, font=value_font, fill=TEXT, anchor="lm")
+        y += 40 + (len(lines) - 1) * 32
+    draw.rectangle((40, top, WIDTH - 40, top + 1), fill=LINE)
 
-    # Separador: línea fina con un tramo azul
-    draw.rectangle((40, 336, WIDTH - 40, 337), fill=LINE)
-    draw.rectangle((40, 335, 160, 338), fill=BLUE)
-
-    if not form and not next_match:
-        # Sin partidos en el plan gratis (ligas que no cubre, como la argentina): un solo aviso
-        # en vez de dos columnas vacías
-        draw.text((WIDTH // 2, 446), "No recent or upcoming matches in our free data",
-                  font=font("text", 24, "SemiBold"), fill=MUTED, anchor="mm")  # fmt: skip
-        draw.text((WIDTH // 2, 482), "Try a club from the top European leagues or Brazil",
-                  font=font("text", 19), fill=(90, 99, 116), anchor="mm")  # fmt: skip
+    if empty:
+        draw.text((40, top + 58), "Match data isn't available for this club yet",
+                  font=font("text", 25, "SemiBold"), fill=MUTED, anchor="lm")  # fmt: skip
         _footer(draw, height)
         return to_png(canvas)
 
     # Racha: cuadrados rectos (ganó azul, empató gris, perdió rojo apagado)
-    draw.text((40, 380), "FORM", font=font("title", 24, "SemiBold"), fill=MUTED, anchor="lm")
+    y = top + 44
+    draw.text((40, y), "FORM", font=font("title", 26, "SemiBold"), fill=MUTED, anchor="lm")
     if form:
         x = 40
         for result in form:
-            draw.rectangle((x, 406, x + 54, 460), fill=FORM_COLORS.get(result, DRAW))
-            draw.text((x + 27, 433), result, font=font("title", 28, "Bold"), fill=TEXT,
+            draw.rectangle((x, y + 28, x + 56, y + 84), fill=FORM_COLORS.get(result, DRAW))
+            draw.text((x + 28, y + 56), result, font=font("title", 30, "Bold"), fill=TEXT,
                       anchor="mm")  # fmt: skip
-            x += 62
+            x += 64
     else:
-        draw.text((40, 433), "No recent matches", font=font("text", 22), fill=MUTED, anchor="lm")
+        draw.text((40, y + 56), "No recent matches", font=font("text", 24), fill=MUTED,
+                  anchor="lm")  # fmt: skip
     if last_result:
         # "Santander 0-3 Real Madrid · Sun 01 Nov": el resultado arriba, la fecha abajo
         result, _, when = last_result.partition(" · ")
-        result_font = font("text", 22, "SemiBold")
-        draw.text((40, 498), truncate(result, result_font, 420), font=result_font, fill=TEXT,
-                  anchor="lm")  # fmt: skip
+        result_font = font("text", 25, "SemiBold")
+        draw.text((40, y + 124), truncate(result, result_font, 420), font=result_font,
+                  fill=TEXT, anchor="lm")  # fmt: skip
         if when:
-            draw.text((40, 528), f"Last match · {when}", font=font("text", 18), fill=MUTED,
-                      anchor="lm")  # fmt: skip
+            draw.text((40, y + 158), f"Last match · {when}", font=font("text", 24),
+                      fill=MUTED, anchor="lm")  # fmt: skip
 
-    # Próximo partido estilo "versus": los dos escudos en cuadros claros
-    draw.text((500, 380), "NEXT MATCH", font=font("title", 24, "SemiBold"), fill=MUTED,
+    # Próximo partido estilo "versus": los dos escudos como stickers
+    draw.text((500, y), "NEXT MATCH", font=font("title", 26, "SemiBold"), fill=MUTED,
               anchor="lm")  # fmt: skip
     if next_match:
-        for crest_bytes, x in ((next_match.home_crest, 548), (next_match.away_crest, 800)):
-            tile(canvas, crest_bytes, (x - 44, 404, x + 44, 492))
-        draw.text((674, 448), "VS", font=font("title", 40, "Bold"), fill=BLUE, anchor="mm")
+        for crest_bytes, x in ((next_match.home_crest, 552), (next_match.away_crest, 806)):
+            tile(canvas, crest_bytes, (x - 56, y + 18, x + 56, y + 130))
+        draw.text((679, y + 74), "VS", font=font("title", 42, "Bold"), fill=BLUE, anchor="mm")
         where = "vs" if next_match.home else "at"
-        line_font = font("text", 22, "SemiBold")
-        draw.text((672, 522), truncate(f"{where} {next_match.opponent}", line_font, 380),
+        line_font = font("text", 25, "SemiBold")
+        draw.text((679, y + 158), truncate(f"{where} {next_match.opponent}", line_font, 380),
                   font=line_font, fill=TEXT, anchor="mm")  # fmt: skip
-        draw.text((672, 552), f"{next_match.when} · {next_match.competition}",
-                  font=font("text", 18), fill=MUTED, anchor="mm")  # fmt: skip
+        detail_font = fit_font(f"{next_match.when} · {next_match.competition}", "text",
+                               "Regular", 24, 390, 16)  # fmt: skip
+        draw.text((679, y + 192), f"{next_match.when} · {next_match.competition}",
+                  font=detail_font, fill=MUTED, anchor="mm")  # fmt: skip
     else:
-        draw.text((500, 433), "No match scheduled", font=font("text", 22), fill=MUTED,
+        draw.text((500, y + 56), "No match scheduled", font=font("text", 24), fill=MUTED,
                   anchor="lm")  # fmt: skip
 
     _footer(draw, height)
     return to_png(canvas)
+
+
+def _wrap(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
+    """Parte el texto en líneas que quepan en `max_width` (por palabras)."""
+    lines: list[str] = []
+    for word in text.split():
+        if lines and fnt.getlength(f"{lines[-1]} {word}") <= max_width:
+            lines[-1] += f" {word}"
+        else:
+            lines.append(word)
+    return [truncate(line, fnt, max_width) for line in lines] or [""]
 
 
 # --- partes comunes ----------------------------------------------------------------------------
@@ -317,4 +371,4 @@ def _footer(draw: ImageDraw.ImageDraw, height: int) -> None:
     """Pie: la firma del bot a la izquierda y la fuente de los datos a la derecha."""
     y = height - FOOTER_H // 2
     wordmark(draw, (30, y), anchor="lm")
-    draw.text((WIDTH - 30, y), SOURCE, font=font("text", 16), fill=(90, 99, 116), anchor="rm")
+    draw.text((WIDTH - 30, y), SOURCE, font=font("text", 17), fill=MUTED, anchor="rm")

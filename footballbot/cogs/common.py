@@ -9,7 +9,8 @@ Para usar un autocompletado en un comando nuevo:
     @app_commands.autocomplete(league=league_autocomplete)
 """
 
-from datetime import date, timedelta
+import io
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import discord
@@ -22,7 +23,6 @@ from footballbot.services.leagues import League, find_league, search_leagues
 if TYPE_CHECKING:
     from footballbot.bot import FootballBot
 
-# Color de la barra lateral de los embeds (verde)
 # El azul del logo del bot (#0B96FE): la barra lateral de todos los embeds
 COLOR = discord.Color.from_rgb(11, 150, 254)
 BRAND_NAME = "FootballTrivia"
@@ -36,6 +36,8 @@ MAX_EMBEDS_PER_MESSAGE = 10
 
 # Palabras aceptadas en la opción `date` de /matches y cuántos días suman a hoy.
 _DAY_WORDS = {"today": 0, "tomorrow": 1, "yesterday": -1}
+# También se entienden en español (no salen en el autocompletado, solo al escribirlos)
+_DAY_ALIASES = {"hoy": 0, "manana": 1, "mañana": 1, "ayer": -1}
 
 
 # --- autocomplete ----------------------------------------------------------------------------
@@ -91,13 +93,15 @@ def parse_day(value: str | None, today: date) -> date:
     if not value or not value.strip():
         return today
     value = value.strip().lower()
-    if value in _DAY_WORDS:
-        return today + timedelta(days=_DAY_WORDS[value])
+    if value in _DAY_WORDS or value in _DAY_ALIASES:
+        return today + timedelta(days={**_DAY_WORDS, **_DAY_ALIASES}[value])
     try:
         return date.fromisoformat(value)
     except ValueError:
         raise UserFacingError(
-            f"**{value}** is not a date. Use `today`, `tomorrow`, `yesterday` or `YYYY-MM-DD`."
+            f"I can't read **{value}** as a date. Use `today`, `tomorrow`, `yesterday` or a "
+            "date like `2026-11-08`.",
+            title="Invalid date",
         ) from None
 
 
@@ -107,27 +111,48 @@ def parse_league(value: str | None) -> League | None:
         return None
     league = find_league(value)
     if league is None:
-        raise UserFacingError(f"Unknown league **{value}**. See `/leagues` for the list.")
+        raise UserFacingError(
+            f"I don't know a league called **{value}**. Pick one from the list while you "
+            "type, or see `/leagues`.",
+            title="Unknown league",
+        )
     return league
 
 
 # --- embeds ----------------------------------------------------------------------------------
 
 
-def branded(
-    embed: discord.Embed, client: discord.Client, section: str | None = None
-) -> discord.Embed:
-    """Cabecera del mensaje con el logo del bot (su avatar): "FootballTrivia · Standings".
+def logo_file() -> discord.File:
+    """El logo del bot con fondo transparente, para la miniatura de un embed.
 
-    Todos los mensajes del bot empiezan igual, como un canal de TV con su mosca: así se
-    reconocen de un vistazo. El pie queda libre para la información del mensaje.
+    El avatar del bot tiene fondo negro y en el embed se ve un cuadrado; este no.
+    Úsalo con `embed.set_thumbnail(url=LOGO_URL)` y `send(..., file=logo_file())`.
     """
-    user = client.user
-    embed.set_author(
-        name=f"{BRAND_NAME} · {section}" if section else BRAND_NAME,
-        icon_url=user.display_avatar.url if user else None,
-    )
-    return embed
+    from footballbot.imaging.draw import logo, to_png  # aquí: Pillow solo cuando hace falta
+
+    return discord.File(io.BytesIO(to_png(logo(256), keep_alpha=True)), filename="logo.png")
+
+
+LOGO_URL = "attachment://logo.png"
+
+
+def command_mention(client: discord.Client, name: str) -> str:
+    """Un comando que se puede tocar para usarlo: "</trivia start:123>" (Discord lo muestra
+    como "/trivia start" en azul). Si todavía no se sabe su id, en negrita.
+
+    Los subcomandos usan el id del grupo: "trivia start" -> el id de "trivia".
+    """
+    ids: dict[str, int] = getattr(client, "command_ids", {})
+    command_id = ids.get(name.split()[0])
+    return f"</{name}:{command_id}>" if command_id else f"**/{name}**"
+
+
+def timestamp(moment: datetime, style: str = "t") -> str:
+    """Hora que Discord muestra en la zona horaria de quien la lee: "<t:1730736000:t>".
+
+    `style`: "t" = 15:00, "R" = "in 2 hours", "f" = fecha y hora.
+    """
+    return f"<t:{int(moment.timestamp())}:{style}>"
 
 
 # Un embed es el "recuadro" con título, campos e imagen que muestra Discord.

@@ -22,7 +22,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from footballbot.cogs.common import branded
 from footballbot.config import Settings
 from footballbot.errors import UserFacingError
 from footballbot.imaging.loader import ImageLoader
@@ -68,6 +67,9 @@ class FootballBot(commands.Bot):
         self.football = FootballService(self.provider, settings.tz)
         self.db = Database(settings.database_url)
         self.images = ImageLoader()
+        # id de cada slash command en Discord ("trivia" -> 123...), para las menciones
+        # clicables (ver command_mention en cogs/common.py). Se llena al sincronizar.
+        self.command_ids: dict[str, int] = {}
         # Todos los errores de slash commands pasan por on_app_command_error (más abajo).
         self.tree.on_error = self.on_app_command_error
 
@@ -92,6 +94,7 @@ class FootballBot(commands.Bot):
             # Sin servidor de pruebas: sincroniza en todos los servidores (producción).
             synced = await self.tree.sync()
             log.info("Synced %d commands globally", len(synced))
+        self.command_ids = {command.name: command.id for command in synced}
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (%s) in %d guilds", self.user, self.user.id, len(self.guilds))
@@ -125,6 +128,7 @@ class FootballBot(commands.Bot):
         # discord.py envuelve nuestra excepción en CommandInvokeError: sacamos la original.
         original = error.original if isinstance(error, app_commands.CommandInvokeError) else error
         report = False
+        title = getattr(original, "title", None)
         match original:
             case UserFacingError():
                 # El usuario se equivocó (fecha mal escrita...): se le muestra el mensaje tal cual.
@@ -149,7 +153,7 @@ class FootballBot(commands.Bot):
                 message = "Something went wrong. The error has been reported."
                 report = True
 
-        await self._reply_error(interaction, message)
+        await self._reply_error(interaction, message, title)
         if report:
             log.error(
                 "Error in /%s",
@@ -187,10 +191,11 @@ class FootballBot(commands.Bot):
         except discord.HTTPException:
             log.exception("Could not send the error report to channel %s", channel_id)
 
-    async def _reply_error(self, interaction: discord.Interaction, message: str) -> None:
+    async def _reply_error(
+        self, interaction: discord.Interaction, message: str, title: str | None = None
+    ) -> None:
         """Responde el error al usuario en un embed rojo apagado. ephemeral=True: solo él lo ve."""
-        embed = discord.Embed(description=message, color=ERROR_COLOR)
-        branded(embed, self)  # la misma cabecera con el logo que el resto de mensajes
+        embed = discord.Embed(title=title, description=message, color=ERROR_COLOR)
         try:
             # Si el comando ya hizo defer() (el "FootballTrivia is thinking..."), hay que
             # responder con followup; si no, con response.send_message.

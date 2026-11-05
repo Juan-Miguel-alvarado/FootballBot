@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from rapidfuzz import fuzz, process
+
 from footballbot.errors import UserFacingError
 from footballbot.models import Competition, Match, Standing, Team
 from footballbot.providers.base import FootballProvider, ProviderError, ProviderHealth
@@ -86,6 +88,29 @@ class FootballService:
         )
         return group_by_competition(m for m in matches if start <= m.kickoff < end)
 
+    async def next_matchday(
+        self, after: date, league: str | None = None, days: int = 10
+    ) -> tuple[date, int] | None:
+        """El siguiente día con partidos después de `after` y cuántos hay (para /matches vacío).
+
+        Una sola petición para los próximos `days` días (el plan gratis deja hasta 10).
+        None si no hay ninguno en ese tiempo.
+        """
+        matches = await self._provider.matches(
+            after + timedelta(days=1),
+            after + timedelta(days=days),
+            competitions=[league] if league else None,
+        )
+        days_found = sorted(
+            m.kickoff.astimezone(self._tz).date()
+            for m in matches
+            if m.kickoff.astimezone(self._tz).date() > after
+        )
+        if not days_found:
+            return None
+        first = days_found[0]
+        return first, days_found.count(first)
+
     async def live(self, league: str | None = None) -> list[MatchGroup]:
         """Partidos que se están jugando ahora.
 
@@ -114,9 +139,12 @@ class FootballService:
         """
         team_id = self.resolve_team_id(query)
         if team_id is None:
-            raise UserFacingError(
-                f"I couldn't find a team called **{query}**. Pick one from the suggestions."
-            )
+            message = f"I couldn't find a team called **{query}**."
+            if close := self.similar_teams(query):
+                message += " Did you mean " + " or ".join(f"**{n}**" for n in close) + "?"
+            else:
+                message += " Start typing the name and pick a team from the list."
+            raise UserFacingError(message, title="Team not found")
         today = self.today()
         # gather: hace las dos peticiones al mismo tiempo en vez de una tras otra.
         team, matches = await asyncio.gather(
@@ -187,6 +215,18 @@ class FootballService:
         ranked.sort(key=lambda r: (r[0], r[1]))
         return [team for _, _, team in ranked[:limit]]
 
+    def similar_teams(self, query: str, limit: int = 2) -> list[str]:
+        """Nombres parecidos a `query` aunque esté mal escrito ("barcelna" -> "FC Barcelona").
+
+        Para sugerirlos en el error de /team. rapidfuzz compara los textos letra a letra.
+        """
+        names = {team.short_name: _core_name(team.name) for team in self._teams.values()}
+        query = _core_name(query)
+        if len(query) < 3:
+            return []
+        hits = process.extract(query, names, scorer=fuzz.ratio, limit=limit, score_cutoff=75)
+        return [name for _, _, name in hits]
+
     def resolve_team_id(self, value: str) -> int | None:
         """Autocomplete sends the team id; a user who ignores it sends free text.
 
@@ -235,3 +275,12 @@ def _match_rank(query: str, keys: tuple[str, ...]) -> int | None:
     if any(query in key for key in keys):
         return 3
     return None
+
+
+# Palabras que casi todos los clubes llevan: no sirven para saber cuál es cuál
+_FILLER_WORDS = {"fc", "cf", "afc", "sc", "ac", "club", "de", "futbol", "football"}
+
+
+def _core_name(name: str) -> str:
+    """ "Real Madrid CF" -> "real madrid", para comparar solo lo que distingue al club."""
+    return " ".join(w for w in normalize(name).split() if w not in _FILLER_WORDS)

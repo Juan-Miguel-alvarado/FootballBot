@@ -30,6 +30,7 @@ from footballbot.services.trivia.dataset import load_dataset
 from footballbot.services.trivia.modes import MODES
 from footballbot.services.trivia.session import STAGE_POINTS
 
+STAGE_SECONDS = 5  # como en cogs/trivia.py: cada cuánto se aclara la imagen
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "preview.gif"
 FRAME = (640, 544)  # tamaño de cada cuadro (la tarjeta de ronda es 800x680)
 STAGE_MS = 650  # cuánto dura cada etapa en el GIF
@@ -59,6 +60,7 @@ def trivia_round(
     name: str,
     subtitle: str | None,
     headline: str,
+    points: int,
     stages: int,
 ) -> list[tuple[Image.Image, int]]:
     """Las etapas de una ronda (cada vez más clara) y la tarjeta de la respuesta."""
@@ -68,7 +70,8 @@ def trivia_round(
         stage_image = render_stage(image, mode.effect, mode.levels[stage], seed=round_no)
         card = trivia_cards.round_card(
             stage_image=stage_image, round_no=round_no, total_rounds=10, title=mode.title,
-            stage=stage, points=STAGE_POINTS, prompt=mode.prompt,
+            stage=stage, points=STAGE_POINTS, prompt=mode.prompt, seconds=STAGE_SECONDS,
+            cue={"zoom": "WIDER", "silhouette": "COLOR"}.get(mode.effect),
         )  # fmt: skip
         frames.append((frame(card), STAGE_MS))
     reveal = trivia_cards.reveal_card(
@@ -77,7 +80,8 @@ def trivia_round(
         subtitle=subtitle,
         headline=headline,
         success=True,
-        label=f"Round {round_no}/10 · Answer",
+        label=f"Round {round_no}/10",
+        points=points,
     )
     frames.append((frame(reveal), CARD_MS))
     return frames
@@ -106,16 +110,16 @@ async def main() -> None:
         }
         frames: list[tuple[Image.Image, int]] = []
         frames += trivia_round(crests[real.id], "crest", 1, real.name, real.subtitle,
-                               "Messi10 got it  +75", 4)  # fmt: skip
+                               "Messi10 got it", 75, 4)  # fmt: skip
         frames += trivia_round(crests[barca.id], "silhouette", 2, barca.name, barca.subtitle,
-                               "ElBicho got it  +50", 4)  # fmt: skip
+                               "ElBicho got it", 50, 4)  # fmt: skip
         frames += trivia_round(crests[liverpool.id], "zoom", 3, liverpool.name,
-                               liverpool.subtitle, "Pibe got it  +75", 3)  # fmt: skip
+                               liverpool.subtitle, "Pibe got it", 75, 3)  # fmt: skip
         argentina = dataset.country_of(boca)
         frames += trivia_round(crests[boca.id], "club-country", 4, argentina.name, boca.name,
-                               "Messi10 got it  +100", 1)  # fmt: skip
+                               "Messi10 got it", 100, 1)  # fmt: skip
         frames += trivia_round(crests[brazil.id], "flag", 5, brazil.name, brazil.subtitle,
-                               "Cholo got it  +50", 3)  # fmt: skip
+                               "Cholo got it", 50, 3)  # fmt: skip
 
         podium = trivia_cards.podium_card(
             title="Game over", subtitle="Mix · 10 rounds · easy",
@@ -123,7 +127,10 @@ async def main() -> None:
         )  # fmt: skip
         frames.append((frame(podium), CARD_MS))
 
-        standings = await info._standings_image(get_league("PL"), await football.standings("PL"))
+        # La tabla puede venir en varias tarjetas (las largas se parten): la primera basta
+        [standings, *_] = await info._standings_image(
+            get_league("PL"), await football.standings("PL")
+        )
         frames.append((frame(standings, crop_top=True), CARD_MS + 600))
         team = await info._team_image(await football.team_profile("86"))
         frames.append((frame(team), CARD_MS + 600))

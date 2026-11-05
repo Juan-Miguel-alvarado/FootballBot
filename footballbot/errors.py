@@ -12,4 +12,9 @@ class UserFacingError(Exception):
     Úsalo cuando el usuario se equivocó (fecha mal escrita, liga que no existe...):
     `raise UserFacingError("Unknown league **xyz**.")` y el bot le responde ese texto,
     solo visible para él. No se reporta al canal de errores porque no es un bug.
+    `title` (opcional) es la primera línea en negrita: "Invalid date", "Team not found"...
     """
+
+    def __init__(self, message: str, title: str | None = None) -> None:
+        super().__init__(message)
+        self.title = title

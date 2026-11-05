@@ -32,7 +32,7 @@ Leagues, teams and dates have autocomplete. Data covers the 13 competitions of f
 |---|---|---|
 | Pixelated crest | A pixelated crest | The club |
 | Blurred crest | A blurred crest | The club |
-| Silhouette | The crest filled black | The club |
+| Silhouette | The crest filled in blue (its colors fade in) | The club |
 | Zoomed crest | A small piece of the crest that zooms out | The club |
 | Club country | A crest | Its country (buttons with flags) |
 | Flags | A pixelated flag | The national team |
@@ -60,7 +60,7 @@ Everything the bot sends follows its logo: a blue ball breaking into fragments o
 - **Cards** (standings, team, trivia rounds, answers, podium, leaderboard) are drawn by the bot with Pillow: flat black, one electric blue (`#0B96FE`), square corners, the logo as a mark in the header and its fragments as decoration.
 - **Crests are stickers**: a light outline that follows their shape, so dark crests (Juventus, Newcastle) still show on black.
 - **Text is sized for phones**, where Discord shrinks images to about 400 px wide.
-- **Messages** all start with the logo and their section (`FootballTrivia · Matches`), use the same blue, keep emojis to flags and 🔴 for live, and never repeat what the image already shows.
+- **Messages** use the same blue, keep emojis to flags and a few status marks, and never repeat what the image already shows. Cards go out as plain images (Discord shows them bigger), times are Discord timestamps (everyone sees their own timezone), commands are clickable, and dead ends get a button (next day, today's matches, play again).
 
 To change the look, start with the palette at the top of [`footballbot/imaging/draw.py`](footballbot/imaging/draw.py); [GUIA.md](GUIA.md) explains where each card lives.
 

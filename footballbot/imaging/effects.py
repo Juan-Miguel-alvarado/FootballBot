@@ -20,24 +20,43 @@ from collections.abc import Callable
 
 from PIL import Image, ImageFilter
 
+from footballbot.imaging.draw import outline_icon
+
 SIZE = 400  # la imagen final es cuadrada, SIZE x SIZE píxeles
-# Gris claro de fondo: un escudo negro o blanco con transparencia se ve en tema claro y oscuro
-BACKGROUND = (226, 229, 233)
+# Fondo oscuro (casi el negro del logo). Los escudos llevan un borde claro de sticker, así se
+# ven también los negros (Juventus) sin poner un recuadro claro que encandile.
+BACKGROUND = (18, 23, 32)
 CREST_SCALE = 0.8  # el escudo ocupa el 80 % del lado; el resto es margen
-SILHOUETTE_COLOR = (22, 24, 30)
+# La silueta se rellena con el azul del logo: se ve sobre el fondo oscuro y es de la marca
+SILHOUETTE_COLOR = (11, 150, 254)
 
 
-def scaled_crest(data: bytes) -> Image.Image:
-    """Abre la imagen y la escala para que su lado mayor ocupe el 80 % de la imagen final."""
+def scaled_crest(data: bytes, outlined: bool = True) -> Image.Image:
+    """Abre la imagen y la escala para que su lado mayor ocupe el 80 % de la imagen final.
+
+    Con `outlined`, le añade el borde claro de sticker (el mismo de las tarjetas).
+    """
     crest = Image.open(io.BytesIO(data)).convert("RGBA")
     target = SIZE * CREST_SCALE
     scale = target / max(crest.size)
     width, height = round(crest.width * scale), round(crest.height * scale)
-    return crest.resize((width, height), Image.Resampling.LANCZOS)
+    crest = crest.resize((width, height), Image.Resampling.LANCZOS)
+    if not outlined:
+        return crest
+    stroke = 9
+    padded = Image.new("RGBA", (width + 2 * stroke, height + 2 * stroke), (0, 0, 0, 0))
+    padded.paste(crest, (stroke, stroke), crest)
+    return outline_icon(padded, stroke)
+
+
+def _box(crest: Image.Image) -> tuple[int, int, int, int]:
+    """Dónde queda el escudo dentro de la imagen final (on_background lo centra)."""
+    left, top = (SIZE - crest.width) // 2, (SIZE - crest.height) // 2
+    return (left, top, left + crest.width, top + crest.height)
 
 
 def on_background(crest: Image.Image) -> Image.Image:
-    """Pega el escudo centrado sobre el fondo gris, al tamaño final."""
+    """Pega el escudo centrado sobre el fondo oscuro, al tamaño final."""
     canvas = Image.new("RGBA", (SIZE, SIZE), (*BACKGROUND, 255))
     # El tercer argumento usa la transparencia del escudo como máscara
     canvas.paste(crest, ((SIZE - crest.width) // 2, (SIZE - crest.height) // 2), crest)
@@ -68,7 +87,10 @@ def silhouette(crest: Image.Image, color_amount: float) -> Image.Image:
     Necesita el escudo con transparencia: la forma sale del canal alfa. Los PNG de
     football-data tienen el fondo transparente.
     """
-    alpha = crest.getchannel("A").point(lambda a: 255 if a > 40 else 0)
+    # Los escudos vienen pequeños y se agrandan: el borde queda en escalones. Se suaviza la
+    # transparencia y se vuelve a endurecer, así el contorno queda liso (sin dientes)
+    alpha = crest.getchannel("A").filter(ImageFilter.GaussianBlur(1.1))
+    alpha = alpha.point(lambda a: max(0, min(255, (a - 128) * 4 + 128)))
     shape = Image.new("RGBA", crest.size, (*SILHOUETTE_COLOR, 255))
     if color_amount > 0:
         shape = Image.blend(shape, crest, color_amount)
@@ -76,21 +98,36 @@ def silhouette(crest: Image.Image, color_amount: float) -> Image.Image:
     return shape
 
 
-def zoom(image: Image.Image, visible: float, seed: int) -> Image.Image:
+def zoom(
+    image: Image.Image,
+    visible: float,
+    seed: int,
+    area: tuple[int, int, int, int] | None = None,
+) -> Image.Image:
     """Muestra solo un trozo (`visible` = qué fracción del lado se ve: 0.2 es un trocito).
 
     El centro del trozo sale de `seed`: es el mismo en todas las etapas de una ronda, así el
-    zoom se va abriendo sobre el mismo punto.
+    zoom se va abriendo sobre el mismo punto. `area` es dónde está el escudo: el trozo se
+    queda dentro (si cabe), para no mostrar un pedazo del fondo como si fuera un mal recorte.
     """
     rng = random.Random(seed)
-    # Un punto dentro de la parte central, donde está el escudo
-    cx = rng.uniform(0.32, 0.68) * image.width
-    cy = rng.uniform(0.32, 0.68) * image.height
     side = max(8, visible * image.width)
+    x0, y0, x1, y1 = area or (0, 0, image.width, image.height)
+
+    def inside(low: int, high: int, fraction: float) -> float:
+        # Un punto entre el 32 % y el 68 % del escudo, sin que el trozo se salga de él
+        lo = max(low + (high - low) * 0.32, low + side / 2)
+        hi = min(low + (high - low) * 0.68, high - side / 2)
+        return lo + (hi - lo) * fraction if lo <= hi else (low + high) / 2
+
+    cx = inside(x0, x1, rng.random())
+    cy = inside(y0, y1, rng.random())
     left = min(max(0, cx - side / 2), image.width - side)
     top = min(max(0, cy - side / 2), image.height - side)
     box = (round(left), round(top), round(left + side), round(top + side))
-    return image.crop(box).resize(image.size, Image.Resampling.LANCZOS)
+    zoomed = image.crop(box).resize(image.size, Image.Resampling.LANCZOS)
+    # Al agrandar tanto el escudo se ve blando: un poco de nitidez
+    return zoomed.filter(ImageFilter.UnsharpMask(radius=2, percent=140, threshold=2))
 
 
 # Cada efecto: (escudo RGBA ya escalado, nivel de la etapa, semilla de la ronda) -> imagen RGB
@@ -98,8 +135,8 @@ EFFECTS: dict[str, Callable[[Image.Image, float, int], Image.Image]] = {
     "none": lambda crest, level, seed: on_background(crest),
     "pixelate": lambda crest, level, seed: pixelate(on_background(crest), level),
     "blur": lambda crest, level, seed: blur(on_background(crest), level),
-    "silhouette": lambda crest, level, seed: on_background(silhouette(crest, level)),
-    "zoom": lambda crest, level, seed: zoom(on_background(crest), level, seed),
+    "silhouette": lambda crest, level, seed: on_background(silhouette(crest, level)),  # sin borde
+    "zoom": lambda crest, level, seed: zoom(on_background(crest), level, seed, _box(crest)),
 }
 
 
@@ -108,7 +145,10 @@ def render_stage(data: bytes, effect: str, level: float | None, seed: int = 0) -
 
     `seed` fija lo que tiene que ser igual en toda la ronda (el punto del zoom).
     """
-    crest = scaled_crest(data)
+    # La silueta y el zoom van sin el borde de sticker: en la silueta se vería la forma del
+    # borde, no la del escudo, y en el zoom el borde blanco parece un recorte mal hecho
+    plain = effect in ("silhouette", "zoom") and level is not None
+    crest = scaled_crest(data, outlined=not plain)
     image = on_background(crest) if level is None else EFFECTS[effect](crest, level, seed)
     output = io.BytesIO()
     image.save(output, format="PNG", optimize=True)
